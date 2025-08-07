@@ -1,6 +1,5 @@
-cmake_minimum_required(VERSION 4.0)
 project(HPC_Project)
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 20)
 
-add_executable(HPC_Project main.cpp)
+add_executable(HPC_Project lbm_solver.cpp)
