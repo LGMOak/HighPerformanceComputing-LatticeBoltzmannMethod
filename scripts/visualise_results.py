@@ -8,14 +8,14 @@ def main():
     Visualisation script for numerical fluid dynamics simulation results (Lattice Boltzmann method)
     """
 
-    if not os.path.exists('velocity_field.csv'):
-        print("Error: velocity_field.csv not found. Run the simulation first.")
+    if not os.path.exists('../data/velocity_field.csv'):
+        print("Error: ../data/velocity_field.csv not found. Run the simulation first.")
         return
 
-    # Read data
-    velocity_data = pd.read_csv('velocity_field.csv')
-    profile_data = pd.read_csv('velocity_profile.csv')
-    params = pd.read_csv('simulation_params.csv')
+    # Read data from data directory (one level up from scripts)
+    velocity_data = pd.read_csv('../data/velocity_field.csv')
+    profile_data = pd.read_csv('../data/velocity_profile.csv')
+    params = pd.read_csv('../data/simulation_params.csv')
 
     # Get parameters
     nx = int(params[params['parameter'] == 'nx']['value'].values[0])
@@ -91,8 +91,8 @@ def main():
     print(f"Theoretical max ux: {(force_x * H**2) / (8 * nu):.6f}")
 
     plt.tight_layout()
-    plt.savefig('lbm_results.png', dpi=300, bbox_inches='tight')
-    print("Visualisation saved as 'lbm_results.png'")
+    plt.savefig('../lbm_results.png', dpi=300, bbox_inches='tight')
+    print("Visualisation saved as '../lbm_results.png'")
     plt.show()
 
 if __name__ == '__main__':
