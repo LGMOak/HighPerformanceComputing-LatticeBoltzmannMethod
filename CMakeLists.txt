@@ -16,13 +16,14 @@ target_compile_options(lbm_solver PRIVATE
         -O3
         -march=native
         -funroll-loops
+        -g
 )
 
 # Conditional flags for specific build types
 if(CMAKE_BUILD_TYPE STREQUAL "O0_Perf")
     # A special build type for your unoptimized baseline with perf support
     target_compile_options(lbm_solver PRIVATE -O0 -g)
-elseif(CMAKE_BUILD_TYPE STREQUAL "ProfileGprof")
+elseif(CMAKE_BUILD_TYPE STREQUAL "Gprof")
     # A specific build type for profiling with gprof
     target_compile_options(lbm_solver PRIVATE -pg -g)
 endif()

@@ -5,6 +5,7 @@
 #include "LBMGrid.h"
 #include <iostream>
 #include <iomanip>
+#include <immintrin.h>
 
 namespace LBM {
     class Solver {
