@@ -7,12 +7,13 @@ int main() {
     try {
         // Configure simulation parameters
         LBM::SimulationParams params;
-        // Laptop parameters
-        params.nx = 200;
-        params.ny = 50;
         params.tau = 1;
         params.force_x = 1e-5;
         params.force_y = 0.0;
+
+        // Loc parameters
+        params.nx = 200;
+        params.ny = 50;
         params.num_timesteps = 10000;
         params.output_frequency = 1000;
 

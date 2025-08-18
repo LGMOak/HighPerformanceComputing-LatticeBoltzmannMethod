@@ -13,8 +13,8 @@ namespace LBM {
 class IOManager {
 public:
     static void write_results(const Grid& grid, const SimulationParams& params) {
-        // Create data directory
-        std::filesystem::create_directories("data");
+        // Create data directory (assumed)
+        // std::filesystem::create_directories("data");
 
         std::cout << "\nWriting output data to CSV files in 'data' directory..." << std::endl;
 
