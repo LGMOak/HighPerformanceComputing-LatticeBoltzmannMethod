@@ -11,7 +11,7 @@ int main() {
         params.force_x = 1e-5;
         params.force_y = 0.0;
 
-        // Loc parameters
+        // Local parameters
         params.nx = 200;
         params.ny = 50;
         params.num_timesteps = 10000;
