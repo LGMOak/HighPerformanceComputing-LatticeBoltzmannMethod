@@ -1,7 +1,0 @@
-parameter,value
-nx,200
-ny,50
-tau,1
-nu,0.166667
-force_x,1e-05
-num_timesteps,10000
