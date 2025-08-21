@@ -7,7 +7,7 @@ int main() {
     try {
         // Configure simulation parameters
         LBM::SimulationParams params;
-        params.tau = 0.6;
+        params.tau = 0.6; // Moderately High Reynolds number -> more computationally demanding
         params.force_x = 5e-5;
         params.force_y = 0.0;
 
