@@ -7,21 +7,27 @@ int main() {
     try {
         // Configure simulation parameters
         LBM::SimulationParams params;
-        params.tau = 1;
-        params.force_x = 1e-5;
+        params.tau = 0.6;
+        params.force_x = 5e-5;
         params.force_y = 0.0;
 
-        // Local parameters
-        params.nx = 200;
-        params.ny = 50;
-        params.num_timesteps = 10000;
+        // Benchmark parameters
+        params.nx = 1024;
+        params.ny = 256;
+        params.num_timesteps = 5000;
         params.output_frequency = 1000;
 
-        // HPC parameters
+        // Scalability parameters
+        // params.nx = 2048;
+        // params.ny = 512;
+        // params.num_timesteps = 10000;
+        // params.output_frequency = 2000;
+
+        // simulation parameters
         // params.nx = 4096;
         // params.ny = 1024;
-        // params.num_timesteps = 50000;
-        // params.output_frequency = 10000;
+        // params.num_timesteps = 20000;
+        // params.output_frequency = 5000;
 
         // Create solver
         LBM::Solver solver(params);
