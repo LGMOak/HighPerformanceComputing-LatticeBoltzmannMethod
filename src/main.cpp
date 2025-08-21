@@ -7,15 +7,12 @@ int main() {
     try {
         // Configure simulation parameters
         LBM::SimulationParams params;
-        params.tau = 0.6; // Moderately High Reynolds number -> more computationally demanding
-        params.force_x = 5e-5;
-        params.force_y = 0.0;
 
         // Benchmark parameters
         params.nx = 1024;
         params.ny = 256;
         params.num_timesteps = 5000;
-        params.output_frequency = 1000;
+        params.output_frequency = 100;
 
         // Scalability parameters
         // params.nx = 2048;

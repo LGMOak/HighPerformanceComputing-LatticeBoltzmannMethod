@@ -4,33 +4,85 @@ project(HPC_PROJECT)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Add include directory for header files
 include_directories(include)
 
-# Create executable with the main source file
 add_executable(lbm_solver src/main.cpp)
+add_executable(lbm_unoptimal src/unoptimal.cpp)
 
-# Define the default flags for all builds, including optimization
-# This applies to all build types unless overwritten
-target_compile_options(lbm_solver PRIVATE
-        -O3
-        -march=native
-        -funroll-loops
-        -g
-)
+# Benchmarking build
+if(CMAKE_BUILD_TYPE STREQUAL "Baseline")
+    # Stage 1: Unoptimised baseline with profiling
+    target_compile_options(lbm_unoptimal PRIVATE
+            -O0 -g -pg
+            -fno-omit-frame-pointer  # Better profiling
+    )
+    target_link_options(lbm_unoptimal PRIVATE -pg)
 
-# Conditional flags for specific build types
-if(CMAKE_BUILD_TYPE STREQUAL "O0_Perf")
-    # A special build type for your unoptimized baseline with perf support
-    target_compile_options(lbm_solver PRIVATE -O0 -g)
-elseif(CMAKE_BUILD_TYPE STREQUAL "Gprof")
-    # A specific build type for profiling with gprof
-    target_compile_options(lbm_solver PRIVATE -pg -g)
-endif()
+    target_compile_options(lbm_solver PRIVATE
+            -O0 -g -pg
+            -fno-omit-frame-pointer
+    )
+    target_link_options(lbm_solver PRIVATE -pg)
+    message(STATUS "Building BASELINE version (-O0 -pg)")
 
-# Set default build type to Release if not specified
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    # Stage 2: Optimisations without compiler optimization
+    target_compile_options(lbm_unoptimal PRIVATE
+            -O0 -g -pg
+            -fno-omit-frame-pointer
+    )
+    target_link_options(lbm_unoptimal PRIVATE -pg)
+
+    target_compile_options(lbm_solver PRIVATE
+            -O0 -g -pg
+            -fno-omit-frame-pointer
+    )
+    target_link_options(lbm_solver PRIVATE -pg)
+    message(STATUS "Building DEBUG_OPTIMIZED version (-O0 -pg)")
+
+elseif(CMAKE_BUILD_TYPE STREQUAL "Simulation")
+    # Stage 3 & 4: Full optimisation
+    target_compile_options(lbm_unoptimal PRIVATE
+            -O3 -g
+            -march=native
+            -funroll-loops
+            -ffast-math
+    )
+
+    target_compile_options(lbm_solver PRIVATE
+            -O3 -g
+            -march=native
+            -funroll-loops
+            -ffast-math
+    )
+    message(STATUS "Building SIMULATION version (-O3)")
+
+elseif(CMAKE_BUILD_TYPE STREQUAL "Perf_Profile")
+    # perf profiling (if needed)
+    target_compile_options(lbm_unoptimal PRIVATE
+            -O3 -g
+            -march=native
+            -fno-omit-frame-pointer
+    )
+
+    target_compile_options(lbm_solver PRIVATE
+            -O3 -g
+            -march=native
+            -fno-omit-frame-pointer
+    )
+    message(STATUS "Building PERF_PROFILE version (-O3 -g)")
+
+else()
+    # Default to simulation build
+    set(CMAKE_BUILD_TYPE Simulation)
+    target_compile_options(lbm_unoptimal PRIVATE
+            -O3 -g -march=native -funroll-loops -ffast-math
+    )
+
+    target_compile_options(lbm_solver PRIVATE
+            -O3 -g -march=native -funroll-loops -ffast-math
+    )
+    message(STATUS "Building DEFAULT (Simulation) version")
 endif()
 
 # Print build information

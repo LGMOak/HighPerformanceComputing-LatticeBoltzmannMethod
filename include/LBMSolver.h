@@ -18,7 +18,7 @@ namespace LBM {
 
         void initialise() {
             std::cout << "LBM Parameters: nx=" << params_.nx << ", ny=" << params_.ny
-                  << ", tau=" << params_.tau << ", nu=" << std::fixed << std::setprecision(4)
+                  << ", tau=" << params_.tau << ", nu=" << std::fixed << std::setprecision(5)
                   << params_.nu() << ", force_x=" << params_.force_x << std::endl;
 
             grid_.initialise();

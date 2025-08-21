@@ -6,14 +6,13 @@
 #include <fstream>
 
 // --- Data Structures and Constants ---
-constexpr int nx = 200;
-constexpr int ny = 50;
-constexpr double tau = 1.0;
-constexpr double force_x = 1e-5;
+constexpr int nx = 1024;
+constexpr int ny = 256;
+constexpr double tau = 0.6;
+constexpr double force_x = 5e-5;
 constexpr double force_y = 0.0;
 constexpr int num_timesteps = 10000;
 constexpr double nu = (tau - 0.5) / 3.0;
-
 
 // discrete velocity vectors (D2Q9 model)
 const std::vector<std::vector<int>> c = {

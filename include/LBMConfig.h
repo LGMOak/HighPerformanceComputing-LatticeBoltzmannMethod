@@ -34,13 +34,15 @@ namespace LBM {
     constexpr std::array<int, Q> OPPOSITE = {0, 3, 4, 1, 2, 7, 8, 5, 6};
 
     struct SimulationParams {
+        double tau = 0.6;
+        double force_x = 5e-5;
+        double force_y = 0.0;
+        // Default local non-HPC parameters
         int nx = 200;
         int ny = 50;
-        double tau = 1.0;
-        double force_x = 1e-5;
-        double force_y = 0.0;
         int num_timesteps = 10000;
         int output_frequency = 1000;
+
 
         // Derived parameters
         double nu() const { return (tau - 0.5) / 3.0; }
