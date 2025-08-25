@@ -6,8 +6,8 @@
 #include <fstream>
 
 // --- Data Structures and Constants ---
-constexpr int nx = 1024;
-constexpr int ny = 256;
+constexpr int nx = 256;
+constexpr int ny = 64;
 constexpr double tau = 0.6;
 constexpr double force_x = 5e-5;
 constexpr double force_y = 0.0;
@@ -42,7 +42,7 @@ void print_progress(int t, const Grid& ux, const Grid& uy);
 
 int main() {
     std::cout << "LBM Parameters: nx=" << nx << ", ny=" << ny
-              << ", tau=" << tau << ", nu=" << std::fixed << std::setprecision(4) << nu
+              << ", tau=" << tau << ", nu=" << std::fixed << std::setprecision(5) << nu
               << ", force_x=" << force_x << std::endl;
 
     // Data structures
