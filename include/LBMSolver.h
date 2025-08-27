@@ -92,7 +92,7 @@ namespace LBM {
                     grid_.ux(x, y) = ux_val;
                     grid_.uy(x, y) = uy_val;
 
-                    // BGK collision
+                    // BGK collision - store results in f_temp
                     grid_.f_temp(x, y, 0) = f0 - tau_inv * (f0 - equilibrium_with_force(0, rho_val, ux_val, uy_val, params_.force_x, params_.force_y));
                     grid_.f_temp(x,y, 1) = f1 - tau_inv * (f1 - equilibrium_with_force(1, rho_val, ux_val, uy_val, params_.force_x, params_.force_y));
                     grid_.f_temp(x,y,2) = f2 - tau_inv * (f2 - equilibrium_with_force(2, rho_val, ux_val, uy_val, params_.force_x, params_.force_y));
@@ -107,24 +107,17 @@ namespace LBM {
         }
 
         void streaming_step() {
-            // Clear f to use as destination
-            for (int x = 0; x < grid_.nx(); ++x) {
-                for (int y = 0; y < grid_.ny(); ++y) {
-                    for (int i = 0; i < Q; ++i) {
-                        grid_.f(x, y, i) = 0.0;
-                    }
-                }
-            }
-
-            // Stream from f_temp (collision results) to f
+            // Stream from f_temp (post-collision) to f
+            // Use a temporary copy to avoid overwriting during streaming
             for (int x = 0; x < grid_.nx(); ++x) {
                 for (int y = 0; y < grid_.ny(); ++y) {
                     for (int i = 0; i < Q; ++i) {
                         int x_dest = periodic_x(x + VELOCITIES[i][0], grid_.nx());
                         int y_dest = y + VELOCITIES[i][1];
 
+                        // Only stream to valid y destinations (walls handle bouncing)
                         if (y_dest >= 0 && y_dest < grid_.ny()) {
-                            grid_.f(x_dest, y_dest, i) = grid_.f_temp(x, y, i);  // Read from f_temp!
+                            grid_.f(x_dest, y_dest, i) = grid_.f_temp(x, y, i);
                         }
                     }
                 }
@@ -136,16 +129,19 @@ namespace LBM {
             const int ceiling = grid_.ny() - 1;
 #pragma GCC ivdep
             for (int x = 0; x < grid_.nx(); ++x) {
-                grid_.f(x, ceiling, 4) = grid_.f_temp(x, ceiling - 1, 2); // Down from up
-                grid_.f(x, ceiling, 7) = grid_.f_temp(x, ceiling - 1, 5); // Down-left from up-right
-                grid_.f(x, ceiling, 8) = grid_.f_temp(x, ceiling - 1, 6); // Down-right from up-left
+                // Bounce back distributions that would stream into the wall
+                grid_.f(x, ceiling, 4) = grid_.f_temp(x, ceiling, 2); // Down from up (at wall)
+                grid_.f(x, ceiling, 7) = grid_.f_temp(x, ceiling, 5); // Down-left from up-right (at wall)
+                grid_.f(x, ceiling, 8) = grid_.f_temp(x, ceiling, 6); // Down-right from up-left (at wall)
             }
+
             // Floor bounce back
 #pragma GCC ivdep
             for (int x = 0; x < grid_.nx(); ++x) {
-                grid_.f(x, 0, 2) = grid_.f_temp(x, 1, 4); // Up from down
-                grid_.f(x, 0, 5) = grid_.f_temp(x, 1, 8); // Up-right from down-left
-                grid_.f(x, 0, 6) = grid_.f_temp(x, 1, 7); // Up-left from down-right
+                // Bounce back distributions that would stream into the wall
+                grid_.f(x, 0, 2) = grid_.f_temp(x, 0, 4); // Up from down (at wall)
+                grid_.f(x, 0, 5) = grid_.f_temp(x, 0, 7); // Up-right from down-left (at wall)
+                grid_.f(x, 0, 6) = grid_.f_temp(x, 0, 8); // Up-left from down-right (at wall)
             }
         }
     };

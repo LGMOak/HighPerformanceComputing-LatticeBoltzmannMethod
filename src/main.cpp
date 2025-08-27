@@ -15,16 +15,16 @@ int main() {
         // params.output_frequency = 1000;
 
         // Benchmark parameters
-        // params.nx = 1024;
-        // params.ny = 256;
-        // params.num_timesteps = 5000;
-        // params.output_frequency = 100;
+        params.nx = 1024;
+        params.ny = 256;
+        params.num_timesteps = 5000;
+        params.output_frequency = 100;
 
         // Scalability parameters
-        params.nx = 2048;
-        params.ny = 512;
-        params.num_timesteps = 10000;
-        params.output_frequency = 2000;
+        // params.nx = 2048;
+        // params.ny = 512;
+        // params.num_timesteps = 10000;
+        // params.output_frequency = 2000;
 
         // simulation parameters
         // params.nx = 4096;
