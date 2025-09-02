@@ -9,21 +9,21 @@ include_directories(include)
 add_executable(lbm_solver src/main.cpp)
 add_executable(lbm_unoptimal src/unoptimal.cpp)
 
+# Benchmarking build
 if(CMAKE_BUILD_TYPE STREQUAL "Baseline")
-    # Stage 1: Naive baseline with profiling
+    # Stage 1: Unoptimised baseline with profiling
     target_compile_options(lbm_unoptimal PRIVATE
             -O0 -g -pg
-            -fno-omit-frame-pointer
+            -fno-omit-frame-pointer  # Better profiling
     )
     target_link_options(lbm_unoptimal PRIVATE -pg)
 
     target_compile_options(lbm_solver PRIVATE
             -O0 -g -pg
             -fno-omit-frame-pointer
-            -mavx2 -mfma
     )
     target_link_options(lbm_solver PRIVATE -pg)
-    message(STATUS "Building BASELINE version (-O0 -pg with AVX2)")
+    message(STATUS "Building BASELINE version (-O0 -pg)")
 
 elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
     # Stage 2: Optimisations without compiler optimization
@@ -36,10 +36,9 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_options(lbm_solver PRIVATE
             -O0 -g -pg
             -fno-omit-frame-pointer
-            -mavx2 -mfma
     )
     target_link_options(lbm_solver PRIVATE -pg)
-    message(STATUS "Building DEBUG_OPTIMIZED version (-O0 -pg with AVX2)")
+    message(STATUS "Building DEBUG_OPTIMIZED version (-O0 -pg)")
 
 elseif(CMAKE_BUILD_TYPE STREQUAL "Simulation")
     # Stage 3 & 4: Full optimisation
@@ -55,9 +54,8 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Simulation")
             -march=native
             -funroll-loops
             -ffast-math
-            -mavx2 -mfma
     )
-    message(STATUS "Building SIMULATION version (-O3 with AVX2)")
+    message(STATUS "Building SIMULATION version (-O3)")
 
 elseif(CMAKE_BUILD_TYPE STREQUAL "Perf_Profile")
     # perf profiling (if needed)
@@ -71,9 +69,8 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Perf_Profile")
             -O3 -g
             -march=native
             -fno-omit-frame-pointer
-            -mavx2 -mfma
     )
-    message(STATUS "Building PERF_PROFILE version (-O3 -g with AVX2)")
+    message(STATUS "Building PERF_PROFILE version (-O3 -g)")
 
 else()
     # Default to simulation build
@@ -84,12 +81,10 @@ else()
 
     target_compile_options(lbm_solver PRIVATE
             -O3 -g -march=native -funroll-loops -ffast-math
-            -mavx2 -mfma
     )
-    message(STATUS "Building DEFAULT (Simulation) version with AVX2")
+    message(STATUS "Building DEFAULT (Simulation) version")
 endif()
 
 # Print build information
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ standard: ${CMAKE_CXX_STANDARD}")
-message(STATUS "AVX2 SIMD optimizations enabled for lbm_solver")
