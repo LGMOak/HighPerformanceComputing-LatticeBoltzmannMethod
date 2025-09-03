@@ -11,8 +11,8 @@ int main(int argc, char* argv[]) {
         LBM::SimulationParams params;
 
         // Animation settings
-        bool enable_animation = false;
-        int animation_frequency = 100;  // Save every 100 timesteps
+        bool enable_animation = true;
+        int animation_frequency = 500;  // Save every 100 timesteps
 
         // Parse command line arguments for animation
         for (int i = 1; i < argc; ++i) {
@@ -35,29 +35,13 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        // O0 flag parameters
-        params.nx = 256;
-        params.ny = 64;
-        params.num_timesteps = 5000;
-        params.output_frequency = 1000;
-
-        // Benchmark parameters
-        // params.nx = 1024;
-        // params.ny = 256;
-        // params.num_timesteps = 5000;
-        // params.output_frequency = 100;
-
-        // Scalability parameters
-        // params.nx = 2048;
-        // params.ny = 512;
-        // params.num_timesteps = 10000;
-        // params.output_frequency = 2000;
-
-        // simulation parameters
-        // params.nx = 4096;
-        // params.ny = 1024;
-        // params.num_timesteps = 20000;
-        // params.output_frequency = 5000;
+        // Simulation parameters
+        params.nx = 1024;
+        params.ny = 256;
+        params.num_timesteps = 50000;
+        params.output_frequency = 100;
+        params.tau = 0.6;
+        params.force_x = 4e-7;
 
         std::cout << "\nSimulation Configuration:" << std::endl;
         std::cout << "  Grid size: " << params.nx << " x " << params.ny << std::endl;
