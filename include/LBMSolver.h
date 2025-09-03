@@ -1,25 +1,46 @@
-# pragma once
+#pragma once
 
 #include "LBMConfig.h"
 #include "LBMUtils.h"
 #include "LBMGrid.h"
+#include "LBMTimeEvolution.h"
 #include <iostream>
 #include <iomanip>
-#include <immintrin.h>
+#include <memory>
 
 namespace LBM {
     class Solver {
     private:
         SimulationParams params_;
         Grid grid_;
+        std::unique_ptr<AnimationWriter> animation_writer_;
+
+        // Animation parameters
+        bool enable_animation_;
+        int animation_frequency_;
 
     public:
-        explicit Solver(const SimulationParams& params) : params_(params) , grid_(params.nx, params.ny) {}
+        explicit Solver(const SimulationParams& params,
+                       bool enable_animation = false,
+                       int animation_frequency = 100)
+            : params_(params), grid_(params.nx, params.ny),
+              enable_animation_(enable_animation),
+              animation_frequency_(animation_frequency) {}
 
         void initialise() {
             std::cout << "LBM Parameters: nx=" << params_.nx << ", ny=" << params_.ny
                   << ", tau=" << params_.tau << ", nu=" << std::fixed << std::setprecision(5)
                   << params_.nu() << ", force_x=" << params_.force_x << std::endl;
+
+            // Initialize animation writer if enabled
+            if (enable_animation_) {
+                std::string filename = "animation_data_" +
+                                     std::to_string(params_.nx) + "x" +
+                                     std::to_string(params_.ny) + ".h5";
+                animation_writer_ = std::make_unique<AnimationWriter>(filename, grid_);
+                std::cout << "Animation enabled. Writing to: " << filename << std::endl;
+                std::cout << "Animation frequency: every " << animation_frequency_ << " timesteps" << std::endl;
+            }
 
             grid_.initialise();
         }
@@ -27,11 +48,16 @@ namespace LBM {
         bool run() {
             std::cout << "Starting LBM Channel Flow simulation (Poiseuille flow)..." << std::endl;
 
-            for (int t = 0; t < params_.num_timesteps; ++t) {
+            // Write initial state if animation enabled
+            if (enable_animation_) {
+                animation_writer_->write_frame(0);
+            }
+
+            for (int t = 1; t <= params_.num_timesteps; ++t) {
                 // Step 1: Collision
                 collision_step();
 
-                // Step 2: Streaming step;
+                // Step 2: Streaming
                 streaming_step();
 
                 // Step 3: Boundary conditions
@@ -39,13 +65,20 @@ namespace LBM {
 
                 // Step 4: Check stability
                 if (!grid_.check_stability()) {
-                    std::cout << "LBM simulation failed to reach equilibrium at timestep " << t << std::endl;
+                    std::cout << "LBM simulation failed at timestep " << t << std::endl;
                     return false;
+                }
+
+                // Step 5: Write animation frame if needed
+                if (enable_animation_ && (t % animation_frequency_ == 0)) {
+                    animation_writer_->write_frame(t);
                 }
 
                 // Progress output
                 if (t % params_.output_frequency == 0) {
-                    std::cout << "Timestep " << t << ": max_vel=" << std::fixed << std::setprecision(4) << grid_.max_velocity() << std::endl;
+                    std::cout << "Timestep " << t << ": max_vel="
+                              << std::fixed << std::setprecision(4)
+                              << grid_.max_velocity() << std::endl;
                 }
             }
 
@@ -61,7 +94,7 @@ namespace LBM {
 
             for (int x = 0; x < params_.nx; ++x) {
                 for (int y = 0; y < params_.ny; ++y) {
-                    // Unroll loop and calculate macroscopic quantities
+                    // ... (same collision implementation as before)
                     double rho_val = 0.0;
                     double ux_val = 0.0;
                     double uy_val = 0.0;
@@ -81,17 +114,15 @@ namespace LBM {
                     ux_val = f1 - f3 + f5 - f6 - f7 + f8;
                     uy_val = f2 - f4 + f5 + f6 - f7 - f8;
 
-                    // Avoid division by zero
                     const double rho_inv = (rho_val < 1e-9) ? 1.0/1e-9 : 1.0/rho_val;
                     ux_val *= rho_inv;
                     uy_val *= rho_inv;
 
-                    // Update quantities
                     grid_.rho(x, y) = rho_val;
                     grid_.ux(x, y) = ux_val;
                     grid_.uy(x, y) = uy_val;
 
-                    // BGK collision - store results in f_temp
+                    // BGK collision (unrolled)
                     grid_.f_temp(x, y, 0) = f0 - tau_inv * (f0 - equilibrium_with_force(0, rho_val, ux_val, uy_val, params_.force_x, params_.force_y));
                     grid_.f_temp(x,y, 1) = f1 - tau_inv * (f1 - equilibrium_with_force(1, rho_val, ux_val, uy_val, params_.force_x, params_.force_y));
                     grid_.f_temp(x,y,2) = f2 - tau_inv * (f2 - equilibrium_with_force(2, rho_val, ux_val, uy_val, params_.force_x, params_.force_y));
@@ -106,15 +137,20 @@ namespace LBM {
         }
 
         void streaming_step() {
-            // Stream from f_temp (post-collision) to f
-            // Use a temporary copy to avoid overwriting during streaming
+            for (int x = 0; x < grid_.nx(); ++x) {
+                for (int y = 0; y < grid_.ny(); ++y) {
+                    for (int i = 0; i < Q; ++i) {
+                        grid_.f(x, y, i) = 0.0;
+                    }
+                }
+            }
+
             for (int x = 0; x < grid_.nx(); ++x) {
                 for (int y = 0; y < grid_.ny(); ++y) {
                     for (int i = 0; i < Q; ++i) {
                         int x_dest = periodic_x(x + VELOCITIES[i][0], grid_.nx());
                         int y_dest = y + VELOCITIES[i][1];
 
-                        // Only stream to valid y destinations (walls handle bouncing)
                         if (y_dest >= 0 && y_dest < grid_.ny()) {
                             grid_.f(x_dest, y_dest, i) = grid_.f_temp(x, y, i);
                         }
@@ -124,21 +160,18 @@ namespace LBM {
         }
 
         void apply_boundary_conditions() {
-            // Ceiling bounce back
             const int ceiling = grid_.ny() - 1;
+
             for (int x = 0; x < grid_.nx(); ++x) {
-                // Bounce back distributions that would stream into the wall
-                grid_.f(x, ceiling, 4) = grid_.f_temp(x, ceiling, 2); // Down from up (at wall)
-                grid_.f(x, ceiling, 7) = grid_.f_temp(x, ceiling, 5); // Down-left from up-right (at wall)
-                grid_.f(x, ceiling, 8) = grid_.f_temp(x, ceiling, 6); // Down-right from up-left (at wall)
+                grid_.f(x, ceiling, 4) = grid_.f_temp(x, ceiling - 1, 2);
+                grid_.f(x, ceiling, 7) = grid_.f_temp(x, ceiling - 1, 5);
+                grid_.f(x, ceiling, 8) = grid_.f_temp(x, ceiling - 1, 6);
             }
 
-            // Floor bounce back
             for (int x = 0; x < grid_.nx(); ++x) {
-                // Bounce back distributions that would stream into the wall
-                grid_.f(x, 0, 2) = grid_.f_temp(x, 0, 4); // Up from down (at wall)
-                grid_.f(x, 0, 5) = grid_.f_temp(x, 0, 7); // Up-right from down-left (at wall)
-                grid_.f(x, 0, 6) = grid_.f_temp(x, 0, 8); // Up-left from down-right (at wall)
+                grid_.f(x, 0, 2) = grid_.f_temp(x, 1, 4);
+                grid_.f(x, 0, 5) = grid_.f_temp(x, 1, 8);
+                grid_.f(x, 0, 6) = grid_.f_temp(x, 1, 7);
             }
         }
     };
