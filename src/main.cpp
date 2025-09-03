@@ -8,29 +8,13 @@ int main() {
         // Configure simulation parameters
         LBM::SimulationParams params;
 
-        // O0 flag parameters
-        params.nx = 256;
-        params.ny = 64;
-        params.num_timesteps = 5000;
-        params.output_frequency = 1000;
-
-        // Benchmark parameters
-        // params.nx = 1024;
-        // params.ny = 256;
-        // params.num_timesteps = 5000;
-        // params.output_frequency = 100;
-
-        // Scalability parameters
-        // params.nx = 2048;
-        // params.ny = 512;
-        // params.num_timesteps = 10000;
-        // params.output_frequency = 2000;
-
-        // simulation parameters
-        // params.nx = 4096;
-        // params.ny = 1024;
-        // params.num_timesteps = 20000;
-        // params.output_frequency = 5000;
+        // Simulation parameters
+        params.nx = 1024;
+        params.ny = 256;
+        params.num_timesteps = 80000;
+        params.output_frequency = 5000;
+        params.tau = 0.6;
+        params.force_x = 4e-7;
 
         // Create solver
         LBM::Solver solver(params);
