@@ -2,10 +2,13 @@
 
 #include <vector>
 #include <array>
+#include <cmath>
+#include <iostream>
+#include <iomanip>
 
 namespace LBM {
 
-    // D2Q9 Lattice - open to generalisation
+    // D2Q9 Lattice
     constexpr int Q = 9;
     constexpr int D = 2;
 
@@ -35,16 +38,47 @@ namespace LBM {
 
     struct SimulationParams {
         double tau = 0.6;
-        double force_x = 5e-5;
+        double force_x = 2e-6;
         double force_y = 0.0;
-        // Default local non-HPC parameters
-        int nx = 200;
-        int ny = 50;
+
+        // Default grid parameters
+        int nx = 256;
+        int ny = 64;
         int num_timesteps = 10000;
         int output_frequency = 1000;
 
-
-        // Derived parameters
         double nu() const { return (tau - 0.5) / 3.0; }
+
+        // Stability check helper
+        double max_theoretical_velocity() const {
+            const double H = ny - 1;
+            return force_x * H * H / (8.0 * nu());
+        }
+
+        double mach_number() const {
+            const double cs = 1.0 / std::sqrt(3.0);
+            return max_theoretical_velocity() / cs;
+        }
+
+        bool is_stable() const {
+            return mach_number() < 0.1;
+        }
+
+        void print_stability_info() const {
+            // help guide simulation parameters
+            const double u_max = max_theoretical_velocity();
+            const double ma = mach_number();
+
+            std::cout << "Stability Analysis:" << std::endl;
+            std::cout << "  Max theoretical velocity: " << std::scientific << u_max << std::endl;
+            std::cout << "  Mach number: " << std::fixed << std::setprecision(4) << ma << std::endl;
+            std::cout << "  Stability: " << (is_stable() ? "STABLE" : "POTENTIALLY UNSTABLE") << std::endl;
+
+            if (!is_stable()) {
+                std::cout << "  WARNING: Consider reducing force_x or increasing tau" << std::endl;
+                const double safe_force = 0.05 / std::sqrt(3.0) * 8.0 * nu() / ((ny-1)*(ny-1));
+                std::cout << "  Suggested max force_x: " << std::scientific << safe_force << std::endl;
+            }
+        }
     };
 }

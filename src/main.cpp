@@ -12,28 +12,7 @@ int main(int argc, char* argv[]) {
 
         // Animation settings
         bool enable_animation = true;
-        int animation_frequency = 500;  // Save every 100 timesteps
-
-        // Parse command line arguments for animation
-        for (int i = 1; i < argc; ++i) {
-            std::string arg = argv[i];
-            if (arg == "--animation" || arg == "-a") {
-                enable_animation = true;
-                std::cout << "Animation enabled" << std::endl;
-            } else if (arg == "--anim-freq" || arg == "-f") {
-                if (i + 1 < argc) {
-                    animation_frequency = std::stoi(argv[++i]);
-                    std::cout << "Animation frequency set to: " << animation_frequency << std::endl;
-                }
-            } else if (arg == "--help" || arg == "-h") {
-                std::cout << "Usage: " << argv[0] << " [options]\n";
-                std::cout << "Options:\n";
-                std::cout << "  --animation, -a          Enable animation output\n";
-                std::cout << "  --anim-freq, -f <freq>   Animation save frequency (default: 100)\n";
-                std::cout << "  --help, -h               Show this help message\n";
-                return 0;
-            }
-        }
+        int animation_frequency = 500;
 
         // Simulation parameters
         params.nx = 1024;
@@ -41,30 +20,15 @@ int main(int argc, char* argv[]) {
         params.num_timesteps = 80000;
         params.output_frequency = 5000;
         params.tau = 0.6;
-        params.force_x = 4e-7;
+        params.force_x = 1.2e-7;
 
         std::cout << "\nSimulation Configuration:" << std::endl;
         std::cout << "  Grid size: " << params.nx << " x " << params.ny << std::endl;
         std::cout << "  Timesteps: " << params.num_timesteps << std::endl;
         std::cout << "  Animation: " << (enable_animation ? "enabled" : "disabled") << std::endl;
-        if (enable_animation) {
-            std::cout << "  Animation frequency: every " << animation_frequency << " timesteps" << std::endl;
-            int expected_frames = params.num_timesteps / animation_frequency + 1;
-            std::cout << "  Expected frames: ~" << expected_frames << std::endl;
 
-            // Estimate file size (rough calculation)
-            double data_per_frame_mb = (params.nx * params.ny * 3 * sizeof(double)) / (1024.0 * 1024.0);
-            double estimated_size_mb = data_per_frame_mb * expected_frames;
-            std::cout << "  Estimated file size: ~" << std::fixed << std::setprecision(1)
-                      << estimated_size_mb << " MB" << std::endl;
-
-            if (estimated_size_mb > 1000) {
-                std::cout << "  WARNING: Large file size expected. Consider increasing animation_frequency." << std::endl;
-            }
-        }
         std::cout << std::endl;
 
-        // Create solver with animation support
         LBM::Solver solver(params, enable_animation, animation_frequency);
         solver.initialise();
 
