@@ -14,13 +14,12 @@ if(CMAKE_BUILD_TYPE STREQUAL "Baseline")
     # Stage 1: Unoptimised baseline with profiling
     target_compile_options(lbm_unoptimal PRIVATE
             -O0 -g -pg
-            -fno-omit-frame-pointer  # Better profiling
+            -fno-omit-frame-pointer
     )
     target_link_options(lbm_unoptimal PRIVATE -pg)
 
     target_compile_options(lbm_solver PRIVATE
             -O0 -g -pg
-            -fno-omit-frame-pointer
     )
     target_link_options(lbm_solver PRIVATE -pg)
     message(STATUS "Building BASELINE version (-O0 -pg)")
@@ -29,13 +28,11 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
     # Stage 2: Optimisations without compiler optimization
     target_compile_options(lbm_unoptimal PRIVATE
             -O0 -g -pg
-            -fno-omit-frame-pointer
     )
     target_link_options(lbm_unoptimal PRIVATE -pg)
 
     target_compile_options(lbm_solver PRIVATE
             -O0 -g -pg
-            -fno-omit-frame-pointer
     )
     target_link_options(lbm_solver PRIVATE -pg)
     message(STATUS "Building DEBUG_OPTIMIZED version (-O0 -pg)")

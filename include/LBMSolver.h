@@ -59,7 +59,6 @@ namespace LBM {
         void collision_step() {
             const double tau_inv = 1.0 / params_.tau;
 
-#pragma GCC ivdep
             for (int x = 0; x < params_.nx; ++x) {
                 for (int y = 0; y < params_.ny; ++y) {
                     // Unroll loop and calculate macroscopic quantities
@@ -127,7 +126,6 @@ namespace LBM {
         void apply_boundary_conditions() {
             // Ceiling bounce back
             const int ceiling = grid_.ny() - 1;
-#pragma GCC ivdep
             for (int x = 0; x < grid_.nx(); ++x) {
                 // Bounce back distributions that would stream into the wall
                 grid_.f(x, ceiling, 4) = grid_.f_temp(x, ceiling, 2); // Down from up (at wall)
@@ -136,7 +134,6 @@ namespace LBM {
             }
 
             // Floor bounce back
-#pragma GCC ivdep
             for (int x = 0; x < grid_.nx(); ++x) {
                 // Bounce back distributions that would stream into the wall
                 grid_.f(x, 0, 2) = grid_.f_temp(x, 0, 4); // Up from down (at wall)

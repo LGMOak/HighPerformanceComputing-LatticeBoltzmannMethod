@@ -65,7 +65,6 @@ namespace LBM {
 
         // Initialise equilibrium distributions
         void initialise() {
-            #pragma GCC ivdep
             for (int x = 0; x < nx_; ++x) {
                 for (int y = 0; y < ny_; ++y) {
                     const double rho_val = rho(x, y);
@@ -104,7 +103,6 @@ namespace LBM {
         // Calculate maximum velocity magnitude
         double max_velocity() const {
             double max_vel_sq = 0.0;
-            #pragma GCC ivdep
             for (int idx = 0; idx < nx_ * ny_; ++idx) {
                 const double vel_sq = ux_[idx] * ux_[idx] + uy_[idx] * uy_[idx];
                 max_vel_sq = std::max(max_vel_sq, vel_sq);
