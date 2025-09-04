@@ -37,9 +37,8 @@ namespace LBM {
         double tau = 0.6;
         double force_x = 5e-5;
         double force_y = 0.0;
-        // Default local non-HPC parameters
-        int nx = 200;
-        int ny = 50;
+        int nx = 256;
+        int ny = 64;
         int num_timesteps = 10000;
         int output_frequency = 1000;
 
