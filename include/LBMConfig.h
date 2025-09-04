@@ -43,7 +43,7 @@ namespace LBM {
         double force_y = 0.0;
         int nx = 256;
         int ny = 64;
-        int num_timesteps = 10000;
+        int num_timesteps = 5000;
         int output_frequency = 1000;
 
         double nu() const { return (tau - 0.5) / 3.0; }

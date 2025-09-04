@@ -15,12 +15,12 @@ int main(int argc, char* argv[]) {
         int animation_frequency = 500;
 
         // Simulation parameters
-        params.nx = 1024;
-        params.ny = 256;
-        params.num_timesteps = 120000;
-        params.output_frequency = 5000;
-        params.tau = 0.6;
-        params.force_x = 1.2e-7;
+        // params.nx = 1024;
+        // params.ny = 256;
+        // params.num_timesteps = 120000;
+        // params.output_frequency = 5000;
+        // params.tau = 0.6;
+        // params.force_x = 1.2e-7;
 
         std::cout << "\nSimulation Configuration:" << std::endl;
         std::cout << "  Grid size: " << params.nx << " x " << params.ny << std::endl;

@@ -6,6 +6,7 @@
 #include "LBMTimeEvolution.h"
 #include <iostream>
 #include <iomanip>
+#include <memory>
 
 namespace LBM {
     class Solver {
