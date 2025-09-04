@@ -122,6 +122,9 @@ namespace LBM {
                     ux_val = f1 - f3 + f5 - f6 - f7 + f8;
                     uy_val = f2 - f4 + f5 + f6 - f7 - f8;
 
+                    ux_val += 0.5 * params_.force_x;
+                    uy_val += 0.5 * params_.force_y;
+
                     // Avoid division by zero
                     const double rho_inv = (rho_val < 1e-9) ? 1.0/1e-9 : 1.0/rho_val;
                     ux_val *= rho_inv;

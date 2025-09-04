@@ -37,11 +37,10 @@ namespace LBM {
     constexpr std::array<int, Q> OPPOSITE = {0, 3, 4, 1, 2, 7, 8, 5, 6};
 
     struct SimulationParams {
+        // Default grid parameters
         double tau = 0.6;
         double force_x = 2e-6;
         double force_y = 0.0;
-
-        // Default grid parameters
         int nx = 256;
         int ny = 64;
         int num_timesteps = 10000;
