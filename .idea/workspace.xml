@@ -1,0 +1,431 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="BackendCodeEditorMiscSettings">
+    <option name="/Default/Housekeeping/FeatureSuggestion/FeatureSuggestionManager/DisabledSuggesters/=SwitchToGoToActionSuggester/@EntryIndexedValue" value="true" type="bool" />
+    <option name="/Default/Housekeeping/LiveTemplatesHousekeeping/HotspotSessionHintIsShown/@EntryValue" value="true" type="bool" />
+  </component>
+  <component name="CMakePresetLoader">{
+  &quot;useNewFormat&quot;: true
+}</component>
+  <component name="CMakeProjectFlavorService">
+    <option name="flavorId" value="CMakePlainProjectFlavor" />
+  </component>
+  <component name="CMakeReloadState">
+    <option name="reloaded" value="true" />
+  </component>
+  <component name="CMakeRunConfigurationManager">
+    <generated>
+      <config projectName="HPC_PROJECT" targetName="lbm_solver" />
+      <config projectName="HPC_PROJECT" targetName="lbm_unoptimal" />
+    </generated>
+  </component>
+  <component name="CMakeSettings">
+    <configurations>
+      <configuration PROFILE_NAME="Debug" ENABLED="true" CONFIG_NAME="Debug" />
+    </configurations>
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="3206e809-1556-4703-999e-5f4fa431fa97" name="Changes" comment="Fixed bugs" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="SIMD" />
+      </map>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;LGMOak&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/LGMOak/HighPerformanceComputing-LatticeBoltzmannMethod.git&quot;,
+    &quot;accountId&quot;: &quot;20273b10-5511-4606-8ddb-24fc2d17508c&quot;
+  }
+}</component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="mock:///home/lgmoak/Nextcloud/University/Courses/COSC7502/Assessment/HPC_Project_LBM/include/LBMConfig.h" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/include/LBMSolver.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="mock:///home/lgmoak/Nextcloud/University/Courses/COSC7502/Assessment/HPC_Project_LBM/include/LBMSolver.h" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///home/lgmoak/Nextcloud/University/Courses/COSC7502/Assessment/HPC_Project_LBM/src/main.cpp" root0="SKIP_HIGHLIGHTING" />
+  </component>
+  <component name="ProjectApplicationVersion">
+    <option name="ide" value="CLion" />
+    <option name="majorVersion" value="2025" />
+    <option name="minorVersion" value="1.4" />
+    <option name="productBranch" value="Classic" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 8
+}</component>
+  <component name="ProjectId" id="30vu64CWpWL4wI7OMrAAGSSBsdR" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "C/C++ File.lbm_solver.cpp.executor": "Debug",
+    "C/C++ File.main.cpp.executor": "Debug",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "Python.lmb-vis.executor": "Run",
+    "RunOnceActivity.RadMigrateCodeStyle": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "RunOnceActivity.west.config.association.type.startup.service": "true",
+    "cf.first.check.clang-format": "false",
+    "cidr.known.project.marker": "true",
+    "git-widget-placeholder": "GPU",
+    "last_opened_file_path": "/home/lgmoak/Nextcloud/University/Courses/COSC7502/Tutorials/T05_MPI",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/scripts" />
+      <recent name="$PROJECT_DIR$/src" />
+      <recent name="$PROJECT_DIR$/include" />
+      <recent name="$PROJECT_DIR$/Data Output" />
+      <recent name="$PROJECT_DIR$/Figures" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Python.visualise_results">
+    <configuration name="lbm_solver" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="HPC_PROJECT" TARGET_NAME="lbm_solver" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="HPC_PROJECT" RUN_TARGET_NAME="lbm_solver">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="lbm_solver" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="HPC_PROJECT" TARGET_NAME="lbm_solver" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="HPC_PROJECT" RUN_TARGET_NAME="lbm_solver">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="lbm_unoptimal" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="HPC_PROJECT" TARGET_NAME="lbm_unoptimal" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="HPC_PROJECT" RUN_TARGET_NAME="lbm_unoptimal">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="lbm_unoptimal" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="HPC_PROJECT" TARGET_NAME="lbm_unoptimal" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="HPC_PROJECT" RUN_TARGET_NAME="lbm_unoptimal">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="lbm_solver.cpp" type="CppFileRunConfiguration" factoryName="CppFileRunConfiguration" nameIsGenerated="true" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="HPC_Project" TARGET_NAME="lbm_solver.cpp" CONFIG_NAME="lbm_solver.cpp">
+      <option name="sourceFile" value="$PROJECT_DIR$/lbm_solver.cpp" />
+      <method v="2">
+        <option name="com.jetbrains.cidr.cpp.runfile.CppFileBuildBeforeRunTaskProvider$BasicBuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="lbm_solver.cpp" type="CppFileRunConfiguration" factoryName="CppFileRunConfiguration" nameIsGenerated="true" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="HPC_Project" TARGET_NAME="lbm_solver.cpp" CONFIG_NAME="lbm_solver.cpp">
+      <option name="sourceFile" value="$PROJECT_DIR$/lbm_solver.cpp" />
+      <method v="2">
+        <option name="com.jetbrains.cidr.cpp.runfile.CppFileBuildBeforeRunTaskProvider$BasicBuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="lbm_solver.cpp" type="CppFileRunConfiguration" factoryName="CppFileRunConfiguration" nameIsGenerated="true" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="HPC_Project" TARGET_NAME="lbm_solver.cpp" CONFIG_NAME="lbm_solver.cpp">
+      <option name="sourceFile" value="$PROJECT_DIR$/lbm_solver.cpp" />
+      <method v="2">
+        <option name="com.jetbrains.cidr.cpp.runfile.CppFileBuildBeforeRunTaskProvider$BasicBuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="visualise_results" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
+      <module name="&quot;HPC - LBM&quot;" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="SDK_NAME" value="Python 3.12 virtualenv at ~/venv/numerical" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/scripts/visualise_results.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="visualise_results" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
+      <module name="&quot;HPC - LBM&quot;" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="SDK_NAME" value="Python 3.12 virtualenv at ~/venv/numerical" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/scripts/visualise_results.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="visualise_results" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
+      <module name="&quot;HPC - LBM&quot;" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="SDK_NAME" value="Python 3.12 virtualenv at ~/venv/numerical" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/scripts/visualise_results.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <list>
+      <item itemvalue="C/C++ File.lbm_solver.cpp" />
+      <item itemvalue="CMake Application.lbm_solver" />
+      <item itemvalue="CMake Application.lbm_unoptimal" />
+      <item itemvalue="Python.visualise_results" />
+    </list>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="3206e809-1556-4703-999e-5f4fa431fa97" name="Changes" comment="" />
+      <created>1754520189266</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1754520189266</updated>
+      <workItem from="1754520191035" duration="30000" />
+      <workItem from="1754520267353" duration="418000" />
+      <workItem from="1754520770053" duration="12620000" />
+      <workItem from="1754630872643" duration="5799000" />
+      <workItem from="1754956731567" duration="218000" />
+      <workItem from="1754961285947" duration="646000" />
+      <workItem from="1755122133736" duration="8700000" />
+      <workItem from="1755492671065" duration="792000" />
+      <workItem from="1755496935091" duration="5569000" />
+      <workItem from="1755752359140" duration="2666000" />
+      <workItem from="1756101569669" duration="4041000" />
+      <workItem from="1756274212310" duration="4431000" />
+      <workItem from="1756353459136" duration="6743000" />
+      <workItem from="1756439624735" duration="3723000" />
+      <workItem from="1756706438943" duration="2922000" />
+      <workItem from="1756711946935" duration="553000" />
+      <workItem from="1756785386735" duration="4496000" />
+      <workItem from="1756868033168" duration="1914000" />
+      <workItem from="1756870556907" duration="8066000" />
+      <workItem from="1756900287300" duration="2730000" />
+      <workItem from="1756936117324" duration="7494000" />
+      <workItem from="1756953893773" duration="489000" />
+      <workItem from="1756962928527" duration="3520000" />
+      <workItem from="1757303832008" duration="636000" />
+      <workItem from="1757311356831" duration="2755000" />
+    </task>
+    <task id="LOCAL-00001" summary="First working version - monolithic main function containing all code. Absolutely zero optimisations made. Added ability to visualise simulation model.">
+      <option name="closed" value="true" />
+      <created>1754528603620</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1754528603620</updated>
+    </task>
+    <task id="LOCAL-00002" summary="Optimised Code exploiting cache spacial locality, loop unrolling, vectorisation. Refactored functions into header files">
+      <option name="closed" value="true" />
+      <created>1755497633179</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1755497633179</updated>
+    </task>
+    <task id="LOCAL-00003" summary="profiler">
+      <option name="closed" value="true" />
+      <created>1755499227364</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1755499227364</updated>
+    </task>
+    <task id="LOCAL-00004" summary="Changed functionality so raw data from csv files stored and loaded in own folder (data)">
+      <option name="closed" value="true" />
+      <created>1755501254877</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1755501254877</updated>
+    </task>
+    <task id="LOCAL-00005" summary="fixed typo">
+      <option name="closed" value="true" />
+      <created>1755502018918</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1755502018918</updated>
+    </task>
+    <task id="LOCAL-00006" summary="Attempted to correct logic bug where f array was cleared too early">
+      <option name="closed" value="true" />
+      <created>1756275920729</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1756275920729</updated>
+    </task>
+    <task id="LOCAL-00007" summary="Changed data values stored for better analysis. Changed directories">
+      <option name="closed" value="true" />
+      <created>1756443816860</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1756443816860</updated>
+    </task>
+    <task id="LOCAL-00008" summary="Implemented SIMD with AVX2. Group the four orthogonal directions together, group the 4 diagonal directions together and treat the stationary vector separately">
+      <option name="closed" value="true" />
+      <created>1756787929793</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1756787929793</updated>
+    </task>
+    <task id="LOCAL-00009" summary="Removed all vectorisation optimisations. Purely serial code">
+      <option name="closed" value="true" />
+      <created>1756868232750</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1756868232750</updated>
+    </task>
+    <task id="LOCAL-00010" summary="Added support for time evolution animation with hdf5">
+      <option name="closed" value="true" />
+      <created>1756881430020</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1756881430020</updated>
+    </task>
+    <task id="LOCAL-00011" summary="Refined simulation parameters">
+      <option name="closed" value="true" />
+      <created>1756885208845</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1756885208845</updated>
+    </task>
+    <task id="LOCAL-00012" summary="Refined simulation parameters">
+      <option name="closed" value="true" />
+      <created>1756885288889</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1756885288889</updated>
+    </task>
+    <task id="LOCAL-00013" summary="Refined simulation parameters">
+      <option name="closed" value="true" />
+      <created>1756901802350</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1756901802350</updated>
+    </task>
+    <task id="LOCAL-00014" summary="Fixed SIMD calculation bug. Renamed array distribution for clarity. Combined streaming and collision step into single step">
+      <option name="closed" value="true" />
+      <created>1756944983003</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1756944983003</updated>
+    </task>
+    <task id="LOCAL-00015" summary="Fixed bugs">
+      <option name="closed" value="true" />
+      <created>1756971566976</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1756971566976</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VCPKGProject">
+    <isAutomaticCheckingOnLaunch value="false" />
+    <isAutomaticFoundErrors value="true" />
+    <isAutomaticReloadCMake value="true" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="First working version - monolithic main function containing all code. Absolutely zero optimisations made. Added ability to visualise simulation model." />
+    <MESSAGE value="Optimised Code exploiting cache spacial locality, loop unrolling, vectorisation. Refactored functions into header files" />
+    <MESSAGE value="profiler" />
+    <MESSAGE value="Changed functionality so raw data from csv files stored and loaded in own folder (data)" />
+    <MESSAGE value="fixed typo" />
+    <MESSAGE value="Attempted to correct logic bug where f array was cleared too early" />
+    <MESSAGE value="Changed data values stored for better analysis. Changed directories" />
+    <MESSAGE value="Implemented SIMD with AVX2. Group the four orthogonal directions together, group the 4 diagonal directions together and treat the stationary vector separately" />
+    <MESSAGE value="Removed all vectorisation optimisations. Purely serial code" />
+    <MESSAGE value="Added support for time evolution animation with hdf5" />
+    <MESSAGE value="Refined simulation parameters" />
+    <MESSAGE value="Fixed SIMD calculation bug. Renamed array distribution for clarity. Combined streaming and collision step into single step" />
+    <MESSAGE value="Fixed bugs" />
+    <option name="LAST_COMMIT_MESSAGE" value="Fixed bugs" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
+  </component>
+</project>
