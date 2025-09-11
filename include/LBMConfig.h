@@ -35,7 +35,7 @@ namespace LBM {
 
     struct SimulationParams {
         double tau = 0.6;
-        double force_x = 5e-5;
+        double force_x = 5e-7;
         double force_y = 0.0;
         int nx = 256;
         int ny = 64;

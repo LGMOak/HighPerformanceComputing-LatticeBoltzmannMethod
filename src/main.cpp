@@ -9,12 +9,12 @@ int main() {
         LBM::SimulationParams params;
 
         // Simulation parameters
-        // params.nx = 1024;
-        // params.ny = 256;
-        // params.num_timesteps = 80000;
-        // params.output_frequency = 5000;
-        // params.tau = 0.6;
-        // params.force_x = 4e-7;
+        params.nx = 512;
+        params.ny = 128;
+        params.num_timesteps = 20000;
+        params.output_frequency = 5000;
+        params.tau = 0.6;
+        params.force_x = 1e-6;
 
         // Create solver
         LBM::Solver solver(params);
