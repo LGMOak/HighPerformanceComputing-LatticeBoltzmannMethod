@@ -1,4 +1,0 @@
-/home/lgmoak/Nextcloud/University/Courses/COSC7502/Assessment/HPC_Project_LBM/build/CMakeFiles/lbm_solver.dir
-/home/lgmoak/Nextcloud/University/Courses/COSC7502/Assessment/HPC_Project_LBM/build/CMakeFiles/lbm_unoptimal.dir
-/home/lgmoak/Nextcloud/University/Courses/COSC7502/Assessment/HPC_Project_LBM/build/CMakeFiles/edit_cache.dir
-/home/lgmoak/Nextcloud/University/Courses/COSC7502/Assessment/HPC_Project_LBM/build/CMakeFiles/rebuild_cache.dir
