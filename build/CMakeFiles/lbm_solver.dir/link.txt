@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/lbm_solver.dir/src/main.cpp.o -o lbm_solver 

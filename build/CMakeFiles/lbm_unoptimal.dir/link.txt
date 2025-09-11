@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/lbm_unoptimal.dir/src/unoptimal.cpp.o -o lbm_unoptimal 
