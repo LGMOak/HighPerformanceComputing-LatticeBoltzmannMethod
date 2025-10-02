@@ -5,15 +5,14 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(OpenMP REQUIRED)
+find_package(MPI REQUIRED)
 
 include_directories(include)
 
 add_executable(lbm_solver src/main.cpp)
-add_executable(lbm_unoptimal src/unoptimal.cpp)
 
 # Link OpenMP to both executables
-target_link_libraries(lbm_solver OpenMP::OpenMP_CXX)
-target_link_libraries(lbm_unoptimal OpenMP::OpenMP_CXX)
+target_link_libraries(lbm_solver OpenMP::OpenMP_CXX MPI::MPI_CXX)
 
 
 set(CMAKE_BUILD_TYPE Simulation)
@@ -28,4 +27,3 @@ message(STATUS "Building simulation with AVX2 + OpenMP")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "OpenMP support: ${OpenMP_FOUND}")
-message(STATUS "AVX2 SIMD + OpenMP optimizations enabled for lbm_solver")

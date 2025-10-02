@@ -18,36 +18,44 @@ namespace LBM {
         explicit Solver(const SimulationParams& params) : params_(params) , grid_(params.nx, params.ny) {}
 
         void initialise() {
-            std::cout << "LBM Parameters: nx=" << params_.nx << ", ny=" << params_.ny
-                  << ", tau=" << params_.tau << ", nu=" << std::fixed << std::setprecision(5)
-                  << params_.nu() << ", force_x=" << params_.force_x << std::endl;
-
-            std::cout << "OpenMP threads: " << omp_get_max_threads() << std::endl;
-
+            if (grid_.mpi_rank() == 0) {
+                std::cout << "LBM Parameters: nx=" << params_.nx << ", ny=" << params_.ny
+                      << ", tau=" << params_.tau << ", nu=" << std::fixed << std::setprecision(5)
+                      << params_.nu() << ", force_x=" << params_.force_x << std::endl;
+            }
             grid_.initialise();
         }
 
         bool run() {
-            std::cout << "Starting LBM Channel Flow simulation (Poiseuille flow)..." << std::endl;
+            if (grid_.mpi_rank() == 0) {
+                std::cout << "Starting LBM Channel Flow simulation (Poiseuille flow)..." << std::endl;
+            }
 
             for (int t = 0; t < params_.num_timesteps; ++t) {
-                // combined collision and streaming step
+                // combined collision-streaming step into f_next()
                 collision_streaming_step();
 
-                // For next time step f_current becomes f_next
-                // f_next will be cleared
+                // Exchange ghost cells in f_next
+                grid_.start_halo_exchange();
+                grid_.complete_halo_exchange();
+
+                // apply boundary conditions on f_next
+                apply_physical_boundary_conditions();
+
+                // f_current now has the post-algorithm data
                 grid_.swap_f_arrays();
 
-                // boundary conditions
-                apply_boundary_conditions();
-
                 if (!grid_.check_stability()) {
-                    std::cout << "LBM simulation failed to reach equilibrium at timestep " << t << std::endl;
+                    // It's helpful to know which rank failed
+                    fprintf(stderr, "Rank %d: LBM simulation failed to reach equilibrium at timestep %d\n", grid_.mpi_rank(), t);
                     return false;
                 }
 
                 if (t % params_.output_frequency == 0) {
-                    std::cout << "Timestep " << t << ": max_vel=" << std::fixed << std::setprecision(4) << grid_.max_velocity() << std::endl;
+                    double max_vel = grid_.max_velocity();
+                    if (grid_.mpi_rank() == 0) {
+                        std::cout << "Timestep " << t << ": max_vel=" << std::fixed << std::setprecision(4) << max_vel << std::endl;
+                    }
                 }
             }
             return true;
@@ -69,10 +77,10 @@ namespace LBM {
                 alignas(32) double f_eq_temp[8];
                 alignas(32) double f_post_collision[Q];
 
-                #pragma omp for schedule(dynamic, 4) nowait
-                for (int y = 0; y < params_.ny; ++y) {
+                #pragma omp for schedule(dynamic, 4)
+                for (int y = 0; y < grid_.local_ny(); ++y) {
                     #pragma GCC ivdep
-                    for (int x = 0; x < params_.nx; ++x) {
+                    for (int x = 0; x < grid_.local_nx(); ++x) {
                         double* f_current_ptr = grid_.f_current_ptr(x, y);
 
                         const __m256d f_1234 = _mm256_loadu_pd(&f_current_ptr[1]);
@@ -119,13 +127,14 @@ namespace LBM {
                         _mm256_storeu_pd(&f_post_collision[1], collision_1234);
                         _mm256_storeu_pd(&f_post_collision[5], collision_5678);
 
-                        // streaming - No race conditions since each thread writes to different f_next locations
+                        // propagate to neighbours
                         for (int i = 0; i < Q; ++i) {
-                            int x_dest = periodic_x(x + VELOCITIES[i][0], grid_.nx());
+                            // int x_dest = periodic_x(x + VELOCITIES[i][0], grid_.local_nx());
+                            int x_dest = (x + VELOCITIES[i][0] + grid_.local_nx()) % grid_.local_nx();
                             int y_dest = y + VELOCITIES[i][1];
 
-                            // Check boundary
-                            if (y_dest >= 0 && y_dest < grid_.ny()) {
+                            // Particles streaming across rank boundaries are handled by halo exchange
+                            if (y_dest >= 0 && y_dest < grid_.local_ny()) {
                                 grid_.f_next(x_dest, y_dest, i) = f_post_collision[i];
                             }
                         }
@@ -134,27 +143,30 @@ namespace LBM {
             }
         }
 
-        void apply_boundary_conditions() {
-            // boundary conditions post stream
-            const int ceiling = grid_.ny() - 1;
-
-            // Parallel boundary condition application
-            #pragma omp parallel
+        void apply_physical_boundary_conditions() {
+#pragma omp parallel
             {
-                // Top wall bounce-back
-                #pragma omp for schedule(static) nowait
-                for (int x = 0; x < grid_.nx(); ++x) {
-                    grid_.f_current(x, ceiling, 4) = grid_.f_current(x, ceiling, 2);
-                    grid_.f_current(x, ceiling, 7) = grid_.f_current(x, ceiling, 5);
-                    grid_.f_current(x, ceiling, 8) = grid_.f_current(x, ceiling, 6);
+                // Bottom wall (y=0) is on rank 0
+                if (grid_.mpi_rank() == 0) {
+#pragma omp for schedule(static) nowait
+                    for (int x = 0; x < grid_.local_nx(); ++x) {
+                        // Explicit bounce-back for bottom wall on f_current
+                        grid_.f_next(x, 0, 2) = grid_.f_next(x, 0, 4); // N from S
+                        grid_.f_next(x, 0, 5) = grid_.f_next(x, 0, 7); // NE from SW
+                        grid_.f_next(x, 0, 6) = grid_.f_next(x, 0, 8); // NW from SE
+                    }
                 }
 
-                // Bottom wall bounce-back
-                #pragma omp for schedule(static) nowait
-                for (int x = 0; x < grid_.nx(); ++x) {
-                    grid_.f_current(x, 0, 2) = grid_.f_current(x, 0, 4);
-                    grid_.f_current(x, 0, 5) = grid_.f_current(x, 0, 7);
-                    grid_.f_current(x, 0, 6) = grid_.f_current(x, 0, 8);
+                // Top wall (y=global_ny-1) is on the last rank
+                if (grid_.mpi_rank() == grid_.mpi_size() - 1) {
+                    const int top_y = grid_.local_ny() - 1;
+#pragma omp for schedule(static) nowait
+                    for (int x = 0; x < grid_.local_nx(); ++x) {
+                        // Explicit bounce-back for top wall on f_current
+                        grid_.f_next(x, top_y, 4) = grid_.f_next(x, top_y, 2); // S from N
+                        grid_.f_next(x, top_y, 7) = grid_.f_next(x, top_y, 5); // SW from NE
+                        grid_.f_next(x, top_y, 8) = grid_.f_next(x, top_y, 6); // SE from NW
+                    }
                 }
             }
         }

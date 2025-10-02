@@ -18,9 +18,9 @@ def main():
     tau = float(params[params['parameter'] == 'tau']['value'].values[0])
 
     # Reshape velocity field data
-    ux = velocity_data['ux'].values.reshape((nx, ny)).T
-    uy = velocity_data['uy'].values.reshape((nx, ny)).T
-    vel_mag = velocity_data['velocity_magnitude'].values.reshape((nx, ny)).T
+    ux = velocity_data['ux'].values.reshape((ny, nx))
+    uy = velocity_data['uy'].values.reshape((ny, nx))
+    vel_mag = velocity_data['velocity_magnitude'].values.reshape((ny, nx))
 
     # Create 3-panel figure
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))

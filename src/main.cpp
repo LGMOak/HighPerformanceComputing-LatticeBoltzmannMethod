@@ -2,19 +2,24 @@
 #include "../include/LBMSolver.h"
 #include "../include/LBMIO.h"
 #include <iostream>
+#include <mpi.h>
 
-int main() {
+int main(int argc, char *argv[]) {
+    // initialise MPI
+    MPI_Init(&argc, &argv);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     try {
         // Configure simulation parameters
         LBM::SimulationParams params;
 
         // Simulation parameters
-        params.nx = 512;
-        params.ny = 128;
-        params.num_timesteps = 20000;
-        params.output_frequency = 5000;
+        params.nx = 1024;
+        params.ny = 256;
+        params.num_timesteps = 80000;
+        params.output_frequency = 1000;
         params.tau = 0.6;
-        params.force_x = 1e-6;
+        params.force_x = 4e-7;
 
         // Create solver
         LBM::Solver solver(params);
@@ -29,10 +34,16 @@ int main() {
         // Write output files
         LBM::IOManager::write_results(solver.get_grid(), solver.get_params());
 
-        std::cout << "\nSimulation completed successfully!" << std::endl;
-        return 0;
+        if (rank == 0) {
+            std::cout << "\nSimulation completed successfully!" << std::endl;
+        }
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        if (rank == 0) {
+            std::cerr << "Error: " << e.what() << std::endl;
+        }
+        MPI_Finalize();
         return 1;
     }
+    MPI_Finalize();
+    return 0;
 }
