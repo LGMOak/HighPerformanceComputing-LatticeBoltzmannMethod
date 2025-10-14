@@ -15,46 +15,41 @@ namespace LBM {
         Grid grid_;
 
     public:
-        explicit Solver(const SimulationParams& params) : params_(params) , grid_(params.nx, params.ny) {}
+        explicit Solver(const SimulationParams& params)
+            : params_(params), grid_(params.nx, params.ny) {}
 
         void initialise() {
             if (grid_.mpi_rank() == 0) {
                 std::cout << "LBM Parameters: nx=" << params_.nx << ", ny=" << params_.ny
-                      << ", tau=" << params_.tau << ", nu=" << std::fixed << std::setprecision(5)
-                      << params_.nu() << ", force_x=" << params_.force_x << std::endl;
+                      << ", tau=" << params_.tau << ", nu=" << std::fixed
+                      << std::setprecision(7) << params_.nu()
+                      << ", force_x=" << std::fixed << std::setprecision(7) << params_.force_x << std::endl;
             }
             grid_.initialise();
         }
 
         bool run() {
             if (grid_.mpi_rank() == 0) {
-                std::cout << "Starting LBM Channel Flow simulation (Poiseuille flow)..." << std::endl;
+                std::cout << "Starting LBM simulation (Final Corrected Decoupled Pull Scheme)..." << std::endl;
             }
 
             for (int t = 0; t < params_.num_timesteps; ++t) {
-                // combined collision-streaming step into f_next()
-                collision_streaming_step();
-
-                // Exchange ghost cells in f_next
-                grid_.start_halo_exchange();
-                grid_.complete_halo_exchange();
-
-                // apply boundary conditions on f_next
+                // unfused and reorded
+                collision_step();
+                grid_.exchange_ghost_cells();
+                streaming_step();
                 apply_physical_boundary_conditions();
 
-                // f_current now has the post-algorithm data
-                grid_.swap_f_arrays();
-
                 if (!grid_.check_stability()) {
-                    // It's helpful to know which rank failed
-                    fprintf(stderr, "Rank %d: LBM simulation failed to reach equilibrium at timestep %d\n", grid_.mpi_rank(), t);
+                    if (grid_.mpi_rank() == 0) fprintf(stderr, "Simulation unstable at timestep %d\n", t);
                     return false;
                 }
 
-                if (t % params_.output_frequency == 0) {
+                if (t > 0 && t % params_.output_frequency == 0) {
                     double max_vel = grid_.max_velocity();
                     if (grid_.mpi_rank() == 0) {
-                        std::cout << "Timestep " << t << ": max_vel=" << std::fixed << std::setprecision(4) << max_vel << std::endl;
+                        std::cout << "Timestep " << t << ": max_vel="
+                                  << std::fixed << std::setprecision(6) << max_vel << std::endl;
                     }
                 }
             }
@@ -65,107 +60,100 @@ namespace LBM {
         const SimulationParams& get_params() const { return params_; }
 
     private:
-        void collision_streaming_step() {
+        void collision_step() {
             const double tau_inv = 1.0 / params_.tau;
-            const __m256d tau_inv_vec = _mm256_set1_pd(tau_inv);
+            const int GHOST = 1;
 
-            // Parallelise over outer y-loop for better work distribution
-            // avoid memory contention in streaming step
-            #pragma omp parallel
-            {
-                // Thread-local variables to avoid false sharing
-                alignas(32) double f_eq_temp[8];
-                alignas(32) double f_post_collision[Q];
+            // even workload - combines nested loops
+#pragma omp parallel for schedule(static) collapse(2)
+            for (int y = 0; y < grid_.local_ny(); ++y) {
+                for (int x = 0; x < grid_.local_nx(); ++x) {
+                    int gx = x + GHOST;
+                    int gy = y + GHOST;
 
-                #pragma omp for schedule(dynamic, 4)
-                for (int y = 0; y < grid_.local_ny(); ++y) {
-                    #pragma GCC ivdep
-                    for (int x = 0; x < grid_.local_nx(); ++x) {
-                        double* f_current_ptr = grid_.f_current_ptr(x, y);
+                    double* f_curr = grid_.f_current_ptr(gx, gy);
+                    double* f_next = grid_.f_next_ptr(gx, gy);
 
-                        const __m256d f_1234 = _mm256_loadu_pd(&f_current_ptr[1]);
-                        const __m256d f_5678 = _mm256_loadu_pd(&f_current_ptr[5]);
+                    // calculate density and macroscopic momentum
+                    double rho_val = 0.0, ux_val = 0.0, uy_val = 0.0;
+                    for(int i = 0; i < Q; ++i) {
+                        rho_val += f_curr[i];
+                        ux_val += VELOCITIES[i][0] * f_curr[i];
+                        uy_val += VELOCITIES[i][1] * f_curr[i];
+                    }
 
-                        double rho_val = f_current_ptr[0];
-                        double ux_val = 0.0;
-                        double uy_val = 0.0;
+                    // apply the force to momentum
+                    ux_val += 0.5 * params_.force_x;
+                    uy_val += 0.5 * params_.force_y;
 
-                        alignas(32) double f_1234_arr[4], f_5678_arr[4];
-                        _mm256_store_pd(f_1234_arr, f_1234);
-                        _mm256_store_pd(f_5678_arr, f_5678);
+                    // final velocity
+                    ux_val /= rho_val;
+                    uy_val /= rho_val;
 
-                        rho_val += f_1234_arr[0] + f_1234_arr[1] + f_1234_arr[2] + f_1234_arr[3] +
-                                  f_5678_arr[0] + f_5678_arr[1] + f_5678_arr[2] + f_5678_arr[3];
+                    // update the grid with the new macroscopic values
+                    grid_.rho(x, y) = rho_val;
+                    grid_.ux(x, y) = ux_val;
+                    grid_.uy(x, y) = uy_val;
 
-                        ux_val = f_1234_arr[0] - f_1234_arr[2] + f_5678_arr[0] - f_5678_arr[1] - f_5678_arr[2] + f_5678_arr[3];
-                        uy_val = f_1234_arr[1] - f_1234_arr[3] + f_5678_arr[0] + f_5678_arr[1] - f_5678_arr[2] - f_5678_arr[3];
+                    // Compute equilibrium distribution with guo forcing
+                    double u_sq = ux_val * ux_val + uy_val * uy_val;
+                    for(int i = 0; i < Q; ++i) {
+                        double ci_u = VELOCITIES[i][0] * ux_val + VELOCITIES[i][1] * uy_val;
 
-                        ux_val += 0.5 * params_.force_x;
-                        uy_val += 0.5 * params_.force_y;
+                        // standard equilibrium
+                        double f_eq_i = WEIGHTS[i] * rho_val * (1.0 + 3.0 * ci_u + 4.5 * ci_u * ci_u - 1.5 * u_sq);
 
-                        const double rho_inv = (rho_val < 1e-9) ? 1.0/1e-9 : 1.0/rho_val;
-                        ux_val *= rho_inv;
-                        uy_val *= rho_inv;
+                        // Gup force term
+                        double force_term = 3.0 * WEIGHTS[i] * (VELOCITIES[i][0] * params_.force_x + VELOCITIES[i][1] * params_.force_y);
 
-                        grid_.rho(x, y) = rho_val;
-                        grid_.ux(x, y) = ux_val;
-                        grid_.uy(x, y) = uy_val;
-
-                        const double f0_eq = equilibrium_with_force_scalar(rho_val, ux_val, uy_val, params_.force_x, params_.force_y);
-                        f_post_collision[0] = f_current_ptr[0] - tau_inv * (f_current_ptr[0] - f0_eq);
-
-                        equilibrium_with_force_simd(rho_val, ux_val, uy_val, params_.force_x, params_.force_y, f_eq_temp);
-                        const __m256d f_eq_1234 = _mm256_loadu_pd(&f_eq_temp[0]);
-                        const __m256d f_eq_5678 = _mm256_loadu_pd(&f_eq_temp[4]);
-
-                        const __m256d diff_1234 = _mm256_sub_pd(f_1234, f_eq_1234);
-                        const __m256d diff_5678 = _mm256_sub_pd(f_5678, f_eq_5678);
-
-                        const __m256d collision_1234 = _mm256_sub_pd(f_1234, _mm256_mul_pd(tau_inv_vec, diff_1234));
-                        const __m256d collision_5678 = _mm256_sub_pd(f_5678, _mm256_mul_pd(tau_inv_vec, diff_5678));
-
-                        _mm256_storeu_pd(&f_post_collision[1], collision_1234);
-                        _mm256_storeu_pd(&f_post_collision[5], collision_5678);
-
-                        // propagate to neighbours
-                        for (int i = 0; i < Q; ++i) {
-                            // int x_dest = periodic_x(x + VELOCITIES[i][0], grid_.local_nx());
-                            int x_dest = (x + VELOCITIES[i][0] + grid_.local_nx()) % grid_.local_nx();
-                            int y_dest = y + VELOCITIES[i][1];
-
-                            // Particles streaming across rank boundaries are handled by halo exchange
-                            if (y_dest >= 0 && y_dest < grid_.local_ny()) {
-                                grid_.f_next(x_dest, y_dest, i) = f_post_collision[i];
-                            }
-                        }
+                        // BGK collision with force
+                        f_next[i] = f_curr[i] - tau_inv * (f_curr[i] - f_eq_i - force_term);
                     }
                 }
             }
         }
 
-        void apply_physical_boundary_conditions() {
-#pragma omp parallel
-            {
-                // Bottom wall (y=0) is on rank 0
-                if (grid_.mpi_rank() == 0) {
-#pragma omp for schedule(static) nowait
-                    for (int x = 0; x < grid_.local_nx(); ++x) {
-                        // Explicit bounce-back for bottom wall on f_current
-                        grid_.f_next(x, 0, 2) = grid_.f_next(x, 0, 4); // N from S
-                        grid_.f_next(x, 0, 5) = grid_.f_next(x, 0, 7); // NE from SW
-                        grid_.f_next(x, 0, 6) = grid_.f_next(x, 0, 8); // NW from SE
+        void streaming_step() {
+            const int GHOST = 1;
+            // even workload - combines nested loops
+            #pragma omp parallel for schedule(static) collapse(2)
+            for (int y = 0; y < grid_.local_ny(); ++y) {
+                for (int x = 0; x < grid_.local_nx(); ++x) {
+                    int gx = x + GHOST;
+                    int gy = y + GHOST;
+                    for (int i = 0; i < Q; ++i) {
+                        int src_x = gx - VELOCITIES[i][0];
+                        int src_y = gy - VELOCITIES[i][1];
+                        grid_.f_current(gx, gy, i) = grid_.f_next(src_x, src_y, i);
                     }
                 }
+            }
+        }
 
-                // Top wall (y=global_ny-1) is on the last rank
-                if (grid_.mpi_rank() == grid_.mpi_size() - 1) {
-                    const int top_y = grid_.local_ny() - 1;
-#pragma omp for schedule(static) nowait
+        // Boundary condition step (on f_current)
+        void apply_physical_boundary_conditions() {
+            const int GHOST = 1;
+            #pragma omp parallel
+            {
+                if (grid_.is_bottom_boundary()) {
+                    // boundary conditions are independent so threads can continue
+                    #pragma omp for schedule(static) nowait
                     for (int x = 0; x < grid_.local_nx(); ++x) {
-                        // Explicit bounce-back for top wall on f_current
-                        grid_.f_next(x, top_y, 4) = grid_.f_next(x, top_y, 2); // S from N
-                        grid_.f_next(x, top_y, 7) = grid_.f_next(x, top_y, 5); // SW from NE
-                        grid_.f_next(x, top_y, 8) = grid_.f_next(x, top_y, 6); // SE from NW
+                        int gx = x + GHOST;
+                        int gy = GHOST;
+                        grid_.f_current(gx, gy, 2) = grid_.f_current(gx, gy, 4);
+                        grid_.f_current(gx, gy, 5) = grid_.f_current(gx, gy, 7);
+                        grid_.f_current(gx, gy, 6) = grid_.f_current(gx, gy, 8);
+                    }
+                }
+                if (grid_.is_top_boundary()) {
+                    #pragma omp for schedule(static) nowait
+                    for (int x = 0; x < grid_.local_nx(); ++x) {
+                        int gx = x + GHOST;
+                        int gy = grid_.local_ny();
+                        grid_.f_current(gx, gy, 4) = grid_.f_current(gx, gy, 2);
+                        grid_.f_current(gx, gy, 7) = grid_.f_current(gx, gy, 5);
+                        grid_.f_current(gx, gy, 8) = grid_.f_current(gx, gy, 6);
                     }
                 }
             }

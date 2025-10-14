@@ -14,212 +14,187 @@ namespace LBM {
     private:
         int global_nx_, global_ny_;
         int local_nx_, local_ny_;
-        int ghost_nodes_;
 
-        // MPI info
+        // Total size including ghost cells
+        int total_nx_, total_ny_;
+        static constexpr int GHOST_LAYERS = 1;
+
+        MPI_Comm cart_comm_;
         int mpi_rank_, mpi_size_;
-        int y_start_, y_end_;
+        int rank_x_, rank_y_;
+        int px_, py_;
 
-        // total rows including ghost nodes
-        int total_local_y_;
+        int north_, south_, east_, west_;
 
-        // Aligned memory
+        int x_start_, y_start_;  // Global coordinates of first interior cell
+
+        // f_current_ holds the post-streaming/BC state
+        // f_next_ holds the post-collision state
         alignas(32) std::vector<double> f_data_;
         double* f_current_;
         double* f_next_;
 
-        // Macroscopic quantities
+        // Macroscopic quantities (interior cells only)
         alignas(32) std::vector<double> rho_;
         alignas(32) std::vector<double> ux_;
         alignas(32) std::vector<double> uy_;
 
-        // Communication buffers (aligned)
-        alignas(32) std::vector<double> send_buffer_up_;
-        alignas(32) std::vector<double> send_buffer_down_;
-        alignas(32) std::vector<double> recv_buffer_up_;
-        alignas(32) std::vector<double> recv_buffer_down_;
+        // Communication buffers for ghost cell exchange
+        alignas(32) std::vector<double> send_buffer_north_;
+        alignas(32) std::vector<double> send_buffer_south_;
+        alignas(32) std::vector<double> send_buffer_east_;
+        alignas(32) std::vector<double> send_buffer_west_;
+        alignas(32) std::vector<double> recv_buffer_north_;
+        alignas(32) std::vector<double> recv_buffer_south_;
+        alignas(32) std::vector<double> recv_buffer_east_;
+        alignas(32) std::vector<double> recv_buffer_west_;
 
-        // MPI requests for non-blocking communication
         std::vector<MPI_Request> mpi_requests_;
 
     public:
-        Grid(int nx, int ny) : global_nx_(nx), global_ny_(ny), ghost_nodes_(1) {
+        Grid(int nx, int ny) : global_nx_(nx), global_ny_(ny) {
             MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank_);
             MPI_Comm_size(MPI_COMM_WORLD, &mpi_size_);
 
-            // simple 1D decomposition
-            local_nx_ = global_nx_; // x not decomposed
-            int base_local_ny = global_ny_ / mpi_size_;
-            int remainder = global_ny_ % mpi_size_;
+            initialise_2d_topology();
 
-            if (mpi_rank_ < remainder) {
-                local_ny_ = base_local_ny + 1;
-                y_start_ = mpi_rank_ * local_ny_;
-            } else {
-                local_ny_ = base_local_ny;
-                y_start_ = remainder * (base_local_ny + 1) + (mpi_rank_ - remainder) * base_local_ny;
-            }
-            y_end_ = y_start_ + local_ny_ - 1;
+            total_nx_ = local_nx_ + 2 * GHOST_LAYERS;
+            total_ny_ = local_ny_ + 2 * GHOST_LAYERS;
 
-            // Total local size including ghost nodes
-            int total_local_ny = local_ny_ + 2 * ghost_nodes_;
-            const size_t grid_size = static_cast<size_t>(local_nx_) * total_local_ny;
-            const size_t f_grid_size = grid_size * Q;
-
-            // distribution functions aligned memory
-            f_data_.resize(f_grid_size * 2);
+            const size_t total_grid_size = static_cast<size_t>(total_nx_) * total_ny_;
+            const size_t f_total_size = total_grid_size * Q;
+            f_data_.resize(f_total_size * 2);
             f_current_ = f_data_.data();
-            f_next_ = f_current_ + f_grid_size;
+            f_next_ = f_current_ + f_total_size;
 
-            // macroscopic quantities
-            rho_.resize(grid_size, 1.0);
-            ux_.resize(grid_size, 0.0);
-            uy_.resize(grid_size, 0.0);
+            const size_t interior_size = static_cast<size_t>(local_nx_) * local_ny_;
+            rho_.resize(interior_size, 1.0);
+            ux_.resize(interior_size, 0.0);
+            uy_.resize(interior_size, 0.0);
 
-            // Initialize communication buffers
-            int buffer_size = local_nx_ * Q;
-            send_buffer_up_.resize(buffer_size);
-            send_buffer_down_.resize(buffer_size);
-            recv_buffer_up_.resize(buffer_size);
-            recv_buffer_down_.resize(buffer_size);
-            mpi_requests_.resize(4);
+            // allocate communication buffers for full exchange (all 9 populations per cell)
+            const int EW_BUF_SIZE = local_ny_ * Q;
+            const int NS_BUF_SIZE = local_nx_ * Q;
+            send_buffer_north_.resize(NS_BUF_SIZE);
+            recv_buffer_north_.resize(NS_BUF_SIZE);
+            send_buffer_south_.resize(NS_BUF_SIZE);
+            recv_buffer_south_.resize(NS_BUF_SIZE);
+            send_buffer_east_.resize(EW_BUF_SIZE);
+            recv_buffer_east_.resize(EW_BUF_SIZE);
+            send_buffer_west_.resize(EW_BUF_SIZE);
+            recv_buffer_west_.resize(EW_BUF_SIZE);
+
+            mpi_requests_.resize(8);
 
             if (mpi_rank_ == 0) {
-                printf("Optimized MPI Grid Setup:\n");
-                printf("  Global: %dx%d\n", global_nx_, global_ny_);
-                printf("  MPI ranks: %d\n", mpi_size_);
-                printf("  Local NY: %d (remainder: %d)\n", base_local_ny, remainder);
+                printf("2D MPI + OpenMP Grid\n");
+                printf("  Global domain: %dx%d\n", global_nx_, global_ny_);
+                printf("  MPI ranks: %d (%dx%d grid)\n", mpi_size_, px_, py_);
+                printf("  Local interior per rank: %dx%d\n", local_nx_, local_ny_);
+                printf("  Local with ghosts: %dx%d\n", total_nx_, total_ny_);
+                printf("  Ghost layers: %d\n", GHOST_LAYERS);
                 printf("  OpenMP threads per rank: %d\n", omp_get_max_threads());
+                printf("  Memory per rank: %.2f MB\n",
+                       (f_total_size * 2 * sizeof(double)) / (1024.0 * 1024.0));
             }
         }
 
-        // Fast inline index calculation
-        inline size_t get_index(int x, int local_y) const {
-            return (static_cast<size_t>(local_y + ghost_nodes_) * local_nx_ + x);
+        inline size_t get_f_index(int x, int y, int i) const {
+            return (static_cast<size_t>(y) * total_nx_ + x) * Q + i;
         }
 
-        inline size_t get_f_index(int x, int local_y, int i) const {
-            return get_index(x, local_y) * Q + i;
+        inline size_t get_interior_index(int x, int y) const {
+            return static_cast<size_t>(y) * local_nx_ + x;
         }
 
         // accessors for distribution functions
-        inline double& f_current(int x, int local_y, int i) {
-            return f_current_[get_f_index(x, local_y, i)];
-        }
+        // non-const allows writing over values
+        inline double& f_current(int x, int y, int i) { return f_current_[get_f_index(x, y, i)]; }
+        inline const double& f_current(int x, int y, int i) const { return f_current_[get_f_index(x, y, i)]; }
+        inline double& f_next(int x, int y, int i) { return f_next_[get_f_index(x, y, i)]; }
+        inline const double& f_next(int x, int y, int i) const { return f_next_[get_f_index(x, y, i)]; }
 
-        inline const double& f_current(int x, int local_y, int i) const {
-            return f_current_[get_f_index(x, local_y, i)];
-        }
+        inline double* f_current_ptr(int x, int y) { return &f_current_[get_f_index(x, y, 0)]; }
+        inline double* f_next_ptr(int x, int y) { return &f_next_[get_f_index(x, y, 0)]; }
 
-        inline double& f_next(int x, int local_y, int i) {
-            return f_next_[get_f_index(x, local_y, i)];
-        }
+        // accessors for macroscopic quantities
+        inline double& rho(int x, int y) { return rho_[get_interior_index(x, y)]; }
+        inline const double& rho(int x, int y) const { return rho_[get_interior_index(x, y)]; }
+        inline double& ux(int x, int y) { return ux_[get_interior_index(x, y)]; }
+        inline const double& ux(int x, int y) const { return ux_[get_interior_index(x, y)]; }
+        inline double& uy(int x, int y) { return uy_[get_interior_index(x, y)]; }
+        inline const double& uy(int x, int y) const { return uy_[get_interior_index(x, y)]; }
 
-        // Pointer access for SIMD operations
-        inline double* f_current_ptr(int x, int local_y) {
-            return &f_current_[get_f_index(x, local_y, 0)];
-        }
-
-        inline double* f_next_ptr(int x, int local_y) {
-            return &f_next_[get_f_index(x, local_y, 0)];
-        }
-
-        // Macroscopic quantity accessors
-        inline double& rho(int x, int local_y) {
-            return rho_[get_index(x, local_y)];
-        }
-
-        inline const double& rho(int x, int local_y) const {
-            return rho_[get_index(x, local_y)];
-        }
-
-        inline double& ux(int x, int local_y) {
-            return ux_[get_index(x, local_y)];
-        }
-
-        inline const double& ux(int x, int local_y) const {
-            return ux_[get_index(x, local_y)];
-        }
-
-        inline double& uy(int x, int local_y) {
-            return uy_[get_index(x, local_y)];
-        }
-
-        inline const double& uy(int x, int local_y) const {
-            return uy_[get_index(x, local_y)];
-        }
-
-        void swap_f_arrays() {
-            std::swap(f_current_, f_next_);
-        }
-
-        // Getters
+        // getters that are needed
+        int x_start() const { return x_start_; }
+        int y_start() const { return y_start_; }
         int local_nx() const { return local_nx_; }
         int local_ny() const { return local_ny_; }
+        int total_nx() const { return total_nx_; }
+        int total_ny() const { return total_ny_; }
+        int mpi_rank() const { return mpi_rank_; }
+        bool is_bottom_boundary() const { return rank_y_ == 0; }
+        bool is_top_boundary() const { return rank_y_ == py_ - 1; }
         int global_nx() const { return global_nx_; }
         int global_ny() const { return global_ny_; }
-        int mpi_rank() const { return mpi_rank_; }
         int mpi_size() const { return mpi_size_; }
-        int y_start() const { return y_start_; }
-        int y_end() const { return y_end_; }
 
         void initialise() {
             alignas(32) double f_eq_temp[8];
 
-            #pragma omp parallel for schedule(static) private(f_eq_temp)
-            for (int x = 0; x < local_nx_; ++x) {
-#pragma GCC ivdep
-                for (int y = 0; y < local_ny_; ++y) {
-                    const double rho_val = rho(x, y);
-                    const double ux_val = ux(x, y);
-                    const double uy_val = uy(x, y);
+            // static schedule means even work load (minimal overhead)
+            // f_eq_temp is private so every thread attains own copy for manipulation avoids race conditions
+            // collapse(2) combines both loops into single iteration space
+            #pragma omp parallel for schedule(static) private(f_eq_temp) collapse(2)
+            for (int y = 0; y < local_ny_; ++y) {
+                for (int x = 0; x < local_nx_; ++x) {
+                    int gx = x + GHOST_LAYERS;
+                    int gy = y + GHOST_LAYERS;
 
-                    double* f_ptr_local = f_current_ptr(x, y);
-
-                    f_ptr_local[0] = equilibrium_scalar(rho_val, ux_val, uy_val);
-                    equilibrium_simd(rho_val, ux_val, uy_val, f_eq_temp);
-
-                    _mm256_storeu_pd(&f_ptr_local[1], _mm256_loadu_pd(&f_eq_temp[0]));
-                    _mm256_storeu_pd(&f_ptr_local[5], _mm256_loadu_pd(&f_eq_temp[4]));
+                    double* f_ptr = f_current_ptr(gx, gy);
+                    f_ptr[0] = equilibrium_scalar(rho(x, y), ux(x, y), uy(x, y));
+                    equilibrium_simd(rho(x, y), ux(x, y), uy(x, y), f_eq_temp);
+                    _mm256_storeu_pd(&f_ptr[1], _mm256_loadu_pd(&f_eq_temp[0]));
+                    _mm256_storeu_pd(&f_ptr[5], _mm256_loadu_pd(&f_eq_temp[4]));
                 }
             }
         }
 
-        // Non-blocking halo exchange
-        void start_halo_exchange() {
-            const int buffer_size = local_nx_ * Q;
+        // echanges 9 velocity vectors in ghost cells
+        void exchange_ghost_cells() {
+            pack_ghost_cells();
+
             int req_idx = 0;
 
-            // Pack boundary data efficiently
-            pack_boundary_data();
+            // east-west communication
+            MPI_Isend(send_buffer_east_.data(), send_buffer_east_.size(), MPI_DOUBLE,
+                     east_, 0, cart_comm_, &mpi_requests_[req_idx++]);
+            MPI_Irecv(recv_buffer_west_.data(), recv_buffer_west_.size(), MPI_DOUBLE,
+                     west_, 0, cart_comm_, &mpi_requests_[req_idx++]);
+            MPI_Isend(send_buffer_west_.data(), send_buffer_west_.size(), MPI_DOUBLE,
+                     west_, 1, cart_comm_, &mpi_requests_[req_idx++]);
+            MPI_Irecv(recv_buffer_east_.data(), recv_buffer_east_.size(), MPI_DOUBLE,
+                     east_, 1, cart_comm_, &mpi_requests_[req_idx++]);
 
-            // Non-blocking sends and receives
-            if (mpi_rank_ < mpi_size_ - 1) {
-                MPI_Isend(send_buffer_up_.data(), buffer_size, MPI_DOUBLE,
-                         mpi_rank_ + 1, 0, MPI_COMM_WORLD, &mpi_requests_[req_idx++]);
-                MPI_Irecv(recv_buffer_up_.data(), buffer_size, MPI_DOUBLE,
-                         mpi_rank_ + 1, 1, MPI_COMM_WORLD, &mpi_requests_[req_idx++]);
+            // north-south communication
+            if (north_ != MPI_PROC_NULL) {
+                MPI_Isend(send_buffer_north_.data(), send_buffer_north_.size(), MPI_DOUBLE,
+                         north_, 2, cart_comm_, &mpi_requests_[req_idx++]);
+                MPI_Irecv(recv_buffer_north_.data(), recv_buffer_north_.size(), MPI_DOUBLE,
+                         north_, 3, cart_comm_, &mpi_requests_[req_idx++]);
+            }
+            if (south_ != MPI_PROC_NULL) {
+                MPI_Isend(send_buffer_south_.data(), send_buffer_south_.size(), MPI_DOUBLE,
+                         south_, 3, cart_comm_, &mpi_requests_[req_idx++]);
+                MPI_Irecv(recv_buffer_south_.data(), recv_buffer_south_.size(), MPI_DOUBLE,
+                         south_, 2, cart_comm_, &mpi_requests_[req_idx++]);
             }
 
-            if (mpi_rank_ > 0) {
-                MPI_Isend(send_buffer_down_.data(), buffer_size, MPI_DOUBLE,
-                         mpi_rank_ - 1, 1, MPI_COMM_WORLD, &mpi_requests_[req_idx++]);
-                MPI_Irecv(recv_buffer_down_.data(), buffer_size, MPI_DOUBLE,
-                         mpi_rank_ - 1, 0, MPI_COMM_WORLD, &mpi_requests_[req_idx++]);
-            }
-        }
-
-        void complete_halo_exchange() {
-            int num_requests = 0;
-            if (mpi_rank_ < mpi_size_ - 1) num_requests += 2;
-            if (mpi_rank_ > 0) num_requests += 2;
-
-            if (num_requests > 0) {
-                MPI_Waitall(num_requests, mpi_requests_.data(), MPI_STATUSES_IGNORE);
+            if (req_idx > 0) {
+                MPI_Waitall(req_idx, mpi_requests_.data(), MPI_STATUSES_IGNORE);
             }
 
-            // Unpack received data
-            unpack_boundary_data();
+            unpack_ghost_cells();
         }
 
         bool check_stability() const {
@@ -227,135 +202,202 @@ namespace LBM {
             const __m256d min_val = _mm256_set1_pd(-1e5);
 
             bool local_stable = true;
-            // const size_t total_size = static_cast<size_t>(local_nx_) * local_ny_ * Q;
-            const size_t total_size = static_cast<size_t>(local_nx_) * (static_cast<size_t>(local_ny_) + 2 * ghost_nodes_) * Q;
+            const size_t total_size = static_cast<size_t>(total_nx_) * total_ny_ * Q;
             const size_t simd_end = (total_size / 4) * 4;
 
-#pragma omp parallel for reduction(&& : local_stable)
+            // combines boolean results from all threads on logical AND
+            #pragma omp parallel for schedule(static) reduction(&& : local_stable)
             for (size_t i = 0; i < simd_end; i += 4) {
                 if (!local_stable) continue;
-
                 __m256d values = _mm256_loadu_pd(&f_current_[i]);
                 __m256d is_finite = _mm256_cmp_pd(values, values, _CMP_EQ_OQ);
                 if (_mm256_movemask_pd(is_finite) != 0xF) {
                     local_stable = false;
                     continue;
                 }
-
                 __m256d too_large = _mm256_cmp_pd(values, max_val, _CMP_GT_OQ);
                 __m256d too_small = _mm256_cmp_pd(values, min_val, _CMP_LT_OQ);
                 if (_mm256_movemask_pd(too_large) || _mm256_movemask_pd(too_small)) {
                     local_stable = false;
                 }
             }
-
-            // Check remaining elements
             for (size_t i = simd_end; i < total_size && local_stable; ++i) {
-                if (!is_stable(f_current_[i])) {
-                    local_stable = false;
-                }
+                if (!is_stable(f_current_[i])) local_stable = false;
             }
 
             int local_stable_int = local_stable ? 1 : 0;
             int global_stable_int;
             MPI_Allreduce(&local_stable_int, &global_stable_int, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
-
-
             return global_stable_int == 1;
         }
 
-
         double max_velocity() const {
             double local_max_sq = 0.0;
-#pragma omp parallel reduction(max : local_max_sq)
+            // max operator across all threads
+            #pragma omp parallel reduction(max : local_max_sq)
             {
-                __m256d thread_max_vec = _mm256_setzero_pd(); // Each thread has its own SIMD max vector
-
-                // Decompose the loop to be thread-safe
-#pragma omp for nowait
+                __m256d thread_max_vec = _mm256_setzero_pd();
+                // ignore barrier - threads continue working without wating for other threads to finish
+                #pragma omp for schedule(static) nowait
                 for (size_t i = 0; i < (static_cast<size_t>(local_nx_) * local_ny_ / 4) * 4; i += 4) {
                     __m256d ux_vec = _mm256_loadu_pd(&ux_[i]);
                     __m256d uy_vec = _mm256_loadu_pd(&uy_[i]);
-                    __m256d vel_sq = _mm256_add_pd(_mm256_mul_pd(ux_vec, ux_vec),
-                                                  _mm256_mul_pd(uy_vec, uy_vec));
+                    __m256d vel_sq = _mm256_add_pd(_mm256_mul_pd(ux_vec, ux_vec), _mm256_mul_pd(uy_vec, uy_vec));
                     thread_max_vec = _mm256_max_pd(thread_max_vec, vel_sq);
                 }
-
-                // After the loop, find the max value within the thread's SIMD vector
                 alignas(32) double max_vals[4];
                 _mm256_store_pd(max_vals, thread_max_vec);
-                double thread_max_scalar = std::max({max_vals[0], max_vals[1], max_vals[2], max_vals[3]});
-
-                // The reduction now happens on the scalar 'local_max_sq'
-                local_max_sq = std::max(local_max_sq, thread_max_scalar);
+                local_max_sq = std::max({max_vals[0], max_vals[1], max_vals[2], max_vals[3]});
             }
-
-            // Handle the few remaining elements outside the parallel region (simpler)
-            const size_t total_elements = static_cast<size_t>(local_nx_) * local_ny_;
-            const size_t simd_end = (total_elements / 4) * 4;
-            for (size_t i = simd_end; i < total_elements; ++i) {
-                const double vel_sq = ux_[i] * ux_[i] + uy_[i] * uy_[i];
-                local_max_sq = std::max(local_max_sq, vel_sq);
+            const size_t total = static_cast<size_t>(local_nx_) * local_ny_;
+            for (size_t i = (total / 4) * 4; i < total; ++i) {
+                local_max_sq = std::max(local_max_sq, ux_[i] * ux_[i] + uy_[i] * uy_[i]);
             }
-
-            // Now, perform the MPI reduction on the final scalar result
             double global_max_sq;
             MPI_Allreduce(&local_max_sq, &global_max_sq, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-
             return std::sqrt(global_max_sq);
         }
 
     private:
-        void pack_boundary_data() {
-            // Pack top boundary (last physical row) for sending to the rank above
-            if (mpi_rank_ < mpi_size_ - 1) {
-                const int top_y = local_ny_ - 1;
-                int buf_idx = 0;
+        void initialise_2d_topology() {
+            find_optimal_decomposition(mpi_size_, global_nx_, global_ny_, px_, py_);
+            int dims[2] = {px_, py_};
+            int periods[2] = {1, 0};  // Periodic in x, walls in y
+            int reorder = 1;
+            MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, reorder, &cart_comm_);
+            MPI_Comm_rank(cart_comm_, &mpi_rank_);
+            int coords[2];
+            MPI_Cart_coords(cart_comm_, mpi_rank_, 2, coords);
+            rank_x_ = coords[0];
+            rank_y_ = coords[1];
+            local_nx_ = global_nx_ / px_;
+            local_ny_ = global_ny_ / py_;
+            x_start_ = rank_x_ * local_nx_;
+            y_start_ = rank_y_ * local_ny_;
+            MPI_Cart_shift(cart_comm_, 0, 1, &west_, &east_);
+            MPI_Cart_shift(cart_comm_, 1, 1, &south_, &north_);
+        }
+
+        void find_optimal_decomposition(int nprocs, int nx, int ny, int& px_out, int& py_out) {
+            double aspect_ratio = static_cast<double>(nx) / ny;
+            double best_score = 1e9;
+            int best_px = 1, best_py = nprocs;
+            for (int px = 1; px <= nprocs; ++px) {
+                if (nprocs % px != 0) continue;
+                int py = nprocs / px;
+                if (nx % px != 0 || ny % py != 0) continue;
+                int lnx = nx / px;
+                int lny = ny / py;
+                double surface = 2.0 * (lnx + lny);
+                double volume = lnx * lny;
+                double local_aspect = static_cast<double>(lnx) / lny;
+                double aspect_penalty = std::abs(std::log(local_aspect / aspect_ratio));
+                double score = surface / std::sqrt(volume) + aspect_penalty;
+                if (score < best_score) {
+                    best_score = score;
+                    best_px = px;
+                    best_py = py;
+                }
+            }
+            px_out = best_px;
+            py_out = best_py;
+        }
+
+        // packs 9 vectors from boundary cells
+        void pack_ghost_cells() {
+            const int G = GHOST_LAYERS;
+            int buf_idx;
+
+            // east boundary
+            buf_idx = 0;
+            for (int y = 0; y < local_ny_; ++y) {
+                int gx = local_nx_ - 1 + G;
+                int gy = y + G;
+                for (int i = 0; i < Q; ++i) {
+                    send_buffer_east_[buf_idx++] = f_next(gx, gy, i);
+                }
+            }
+
+            // west boundary
+            buf_idx = 0;
+            for (int y = 0; y < local_ny_; ++y) {
+                int gx = G;
+                int gy = y + G;
+                for (int i = 0; i < Q; ++i) {
+                    send_buffer_west_[buf_idx++] = f_next(gx, gy, i);
+                }
+            }
+
+            // north boundary
+            if (north_ != MPI_PROC_NULL) {
+                buf_idx = 0;
                 for (int x = 0; x < local_nx_; ++x) {
+                    int gx = x + G;
+                    // CORRECTED LINE:
+                    int gy = local_ny_ - 1 + G; // Use the TOP row
                     for (int i = 0; i < Q; ++i) {
-                        send_buffer_up_[buf_idx++] = f_next(x, top_y, i);
+                        send_buffer_north_[buf_idx++] = f_next(gx, gy, i);
                     }
                 }
             }
 
-            // Pack bottom boundary (first physical row) for sending to the rank below
-            if (mpi_rank_ > 0) {
-                int buf_idx = 0;
+            // south boundary
+            if (south_ != MPI_PROC_NULL) {
+                buf_idx = 0;
                 for (int x = 0; x < local_nx_; ++x) {
+                    int gx = x + G;
+                    int gy = G; // Use the BOTTOM row
                     for (int i = 0; i < Q; ++i) {
-                        send_buffer_down_[buf_idx++] = f_next(x, 0, i);
+                        send_buffer_south_[buf_idx++] = f_next(gx, gy, i);
                     }
                 }
             }
         }
 
-        void unpack_boundary_data() {
-            // Receive and apply particles that streamed from neighbor
+        void unpack_ghost_cells() {
+            const int G = GHOST_LAYERS;
+            int buf_idx;
 
-            if (mpi_rank_ < mpi_size_ - 1) {
-                // Receive from upper neighbor (their bottom row streams down to us)
-                int buf_idx = 0;
+            // west ghost layer
+            buf_idx = 0;
+            for (int y = 0; y < local_ny_; ++y) {
+                int gx = 0;
+                int gy = y + G;
+                for (int i = 0; i < Q; ++i) {
+                    f_next(gx, gy, i) = recv_buffer_west_[buf_idx++];
+                }
+            }
+
+            // east ghost layer
+            buf_idx = 0;
+            for (int y = 0; y < local_ny_; ++y) {
+                int gx = total_nx_ - 1;
+                int gy = y + G;
+                for (int i = 0; i < Q; ++i) {
+                    f_next(gx, gy, i) = recv_buffer_east_[buf_idx++];
+                }
+            }
+
+            // south ghost layer
+            if (south_ != MPI_PROC_NULL) {
+                buf_idx = 0;
                 for (int x = 0; x < local_nx_; ++x) {
+                    int gx = x + G;
+                    int gy = 0;
                     for (int i = 0; i < Q; ++i) {
-                        // Only accept particles moving DOWNWARD
-                        if (VELOCITIES[i][1] < 0) {
-                            f_next(x, local_ny_ - 1, i) = recv_buffer_up_[buf_idx];
-                        }
-                        buf_idx++;
+                        f_next(gx, gy, i) = recv_buffer_south_[buf_idx++];
                     }
                 }
             }
 
-            if (mpi_rank_ > 0) {
-                // Receive from lower neighbor (their top row streams up to us)
-                int buf_idx = 0;
+            // north ghost layer
+            if (north_ != MPI_PROC_NULL) {
+                buf_idx = 0;
                 for (int x = 0; x < local_nx_; ++x) {
+                    int gx = x + G;
+                    int gy = total_ny_ - 1;
                     for (int i = 0; i < Q; ++i) {
-                        // Only accept particles moving UPWARD
-                        if (VELOCITIES[i][1] > 0) {
-                            f_next(x, 0, i) = recv_buffer_down_[buf_idx];
-                        }
-                        buf_idx++;
+                        f_next(gx, gy, i) = recv_buffer_north_[buf_idx++];
                     }
                 }
             }
