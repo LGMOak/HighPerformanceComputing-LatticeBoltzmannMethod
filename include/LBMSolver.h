@@ -3,6 +3,7 @@
 #include "LBMConfig.h"
 #include "LBMUtils.h"
 #include "LBMGrid.h"
+#include "LBMIO.h"
 #include <iostream>
 #include <iomanip>
 #include <immintrin.h>
@@ -32,23 +33,21 @@ namespace LBM {
             grid_.initialise(params_.inlet_velocity);
         }
 
-        bool run() {
+        bool run(IOManager& io_manager) {
             if (grid_.mpi_rank() == 0) {
                 std::cout << "Starting LBM cylinder flow simulation..." << std::endl;
             }
 
             for (int t = 0; t < params_.num_timesteps; ++t) {
-                // CORRECT ORDER:
-                // 1. Collision (f_current -> f_next)
                 collision_step();
 
-                // 2. Exchange ghost cells (f_next between ranks)
+                // Record forces AFTER collision, as it reads from the f_next array
+                if (t % params_.output_frequency == 0) {
+                    io_manager.record_forces(t, grid_, params_);
+                }
+
                 grid_.exchange_ghost_cells();
-
-                // 3. Streaming (f_next -> f_current, reading from neighbors)
                 streaming_step();
-
-                // 4. Apply ALL boundary conditions to f_current (after streaming)
                 apply_boundary_conditions();
 
                 if (!grid_.check_stability()) {

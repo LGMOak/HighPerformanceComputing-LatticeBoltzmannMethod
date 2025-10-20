@@ -12,70 +12,188 @@
 namespace LBM {
 
 class IOManager {
+private:
+    std::ofstream force_file_;
+    int mpi_rank_;
+    bool force_file_open_;
+
 public:
-    static void write_results(const Grid& grid, const SimulationParams& params) {
-        if (grid.mpi_rank() == 0) {
-            std::cout << "\nGathering results..." << std::endl;
+    IOManager() : mpi_rank_(-1), force_file_open_(false) {
+        MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank_);
+        if (mpi_rank_ == 0) {
+            force_file_.open("forces.csv");
+            if (force_file_) {
+                force_file_ << "timestep,drag_force,lift_force,drag_coeff,lift_coeff\n";
+                force_file_open_ = true;
+            } else {
+                std::cerr << "ERROR: Could not open forces.csv\n";
+            }
+        }
+    }
+
+    ~IOManager() {
+        if (mpi_rank_ == 0 && force_file_open_) {
+            force_file_.close();
+        }
+    }
+
+    // Call this after collision but before streamiing
+    void record_forces(int timestep, const Grid& grid, const SimulationParams& params) {
+        double local_fx = 0.0;
+        double local_fy = 0.0;
+        const int GHOST = 1;
+
+        // Momentum exchange method:
+        // For each solid cell, sum the momentum of populations that would stream
+        // from fluid neighbors into this solid cell
+
+        for (int y = 0; y < grid.local_ny(); ++y) {
+            for (int x = 0; x < grid.local_nx(); ++x) {
+                // Only process solid cells
+                if (!grid.is_solid(x, y)) continue;
+
+                int gx = x + GHOST;
+                int gy = y + GHOST;
+
+                // For each direction, check if there's a fluid neighbor
+                // that would stream into this solid cell
+                for (int i = 1; i < Q; ++i) {
+                    // Look in the OPPOSITE direction to find the fluid cell
+                    // that has a population pointing toward this solid cell
+                    int opp_i = OPPOSITE[i];
+
+                    // Fluid neighbor location (in local coordinates)
+                    int fluid_x = x - VELOCITIES[i][0];
+                    int fluid_y = y - VELOCITIES[i][1];
+
+                    // Check if this neighbor is in bounds and is fluid
+                    if (fluid_x >= 0 && fluid_x < grid.local_nx() &&
+                        fluid_y >= 0 && fluid_y < grid.local_ny() &&
+                        !grid.is_solid(fluid_x, fluid_y))
+                    {
+                        // The fluid neighbor at (fluid_x, fluid_y) has a population
+                        // in direction 'i' pointing toward this solid cell
+                        int fluid_gx = fluid_x + GHOST;
+                        int fluid_gy = fluid_y + GHOST;
+
+                        // Read the post-collision population (f_next) that will bounce back
+                        double f_i = grid.f_next(fluid_gx, fluid_gy, i);
+
+                        // Momentum transfer: 2 * c_i * f_i
+                        // (factor of 2 because momentum reverses)
+                        local_fx += 2.0 * VELOCITIES[i][0] * f_i;
+                        local_fy += 2.0 * VELOCITIES[i][1] * f_i;
+                    }
+                }
+            }
         }
 
-        // Gather velocity and density data
+        // Sum forces across all MPI ranks
+        double global_fx = 0.0;
+        double global_fy = 0.0;
+        MPI_Reduce(&local_fx, &global_fx, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+        MPI_Reduce(&local_fy, &global_fy, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+
+        // Rank 0 writes to file
+        if (mpi_rank_ == 0 && force_file_open_) {
+            double rho_ref = 1.0;
+            double U_ref = params.inlet_velocity;
+            double D_ref = 2.0 * params.get_cylinder_radius_cells();
+
+            double q_ref = 0.5 * rho_ref * U_ref * U_ref * D_ref;
+            double C_D = (q_ref > 1e-12) ? global_fx / q_ref : 0.0;
+            double C_L = (q_ref > 1e-12) ? global_fy / q_ref : 0.0;
+
+            force_file_ << timestep << ","
+                        << std::fixed << std::setprecision(8)
+                        << global_fx << ","
+                        << global_fy << ","
+                        << C_D << ","
+                        << C_L << "\n";
+
+            // Flush periodically for monitoring
+            if (timestep % 10000 == 0) {
+                force_file_.flush();
+            }
+        }
+    }
+
+    void write_final_results(const Grid& grid, const SimulationParams& params) {
+        if (mpi_rank_ == 0) {
+            std::cout << "\nGathering final results..." << std::endl;
+        }
+
         std::vector<double> global_ux, global_uy, global_rho;
-        if (grid.mpi_rank() == 0) {
-            global_ux.resize(grid.global_nx() * grid.global_ny(), 0.0);
-            global_uy.resize(grid.global_nx() * grid.global_ny(), 0.0);
-            global_rho.resize(grid.global_nx() * grid.global_ny(), 1.0);
+        if (mpi_rank_ == 0) {
+            global_ux.resize(grid.global_nx() * grid.global_ny());
+            global_uy.resize(grid.global_nx() * grid.global_ny());
+            global_rho.resize(grid.global_nx() * grid.global_ny());
         }
 
-        struct RankInfo {
-            int x_start, y_start, local_nx, local_ny;
-        };
+        gather_and_reconstruct_field(grid, global_ux, global_uy, global_rho);
 
-        RankInfo my_info;
-        my_info.local_nx = grid.local_nx();
-        my_info.local_ny = grid.local_ny();
-        my_info.x_start = grid.x_start();
-        my_info.y_start = grid.y_start();
+        if (mpi_rank_ == 0) {
+            write_velocity_field(global_ux, global_uy, global_rho, params);
+            write_simulation_params(global_ux, global_uy, params);
 
-        std::vector<RankInfo> all_info(grid.mpi_size());
+            // Calculate time-averaged drag from forces.csv
+            calculate_time_averaged_drag();
+
+            std::cout << "Files written: velocity_field.csv, simulation_params.csv, forces.csv" << std::endl;
+        }
+
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
+
+private:
+    static void gather_and_reconstruct_field(const Grid& grid,
+                                            std::vector<double>& global_ux,
+                                            std::vector<double>& global_uy,
+                                            std::vector<double>& global_rho) {
+        int mpi_rank, mpi_size;
+        MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+        MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+
+        struct RankInfo { int x_start, y_start, local_nx, local_ny; };
+        RankInfo my_info = {grid.x_start(), grid.y_start(), grid.local_nx(), grid.local_ny()};
+
+        std::vector<RankInfo> all_info(mpi_size);
         MPI_Gather(&my_info, sizeof(RankInfo), MPI_BYTE,
                    all_info.data(), sizeof(RankInfo), MPI_BYTE,
                    0, MPI_COMM_WORLD);
 
-        // Prepare flat arrays
-        std::vector<double> local_ux_flat(grid.local_nx() * grid.local_ny());
-        std::vector<double> local_uy_flat(grid.local_nx() * grid.local_ny());
-        std::vector<double> local_rho_flat(grid.local_nx() * grid.local_ny());
+        std::vector<double> local_ux_flat(my_info.local_nx * my_info.local_ny);
+        std::vector<double> local_uy_flat(my_info.local_nx * my_info.local_ny);
+        std::vector<double> local_rho_flat(my_info.local_nx * my_info.local_ny);
 
-        for (int y = 0; y < grid.local_ny(); ++y) {
-            for (int x = 0; x < grid.local_nx(); ++x) {
-                int idx = y * grid.local_nx() + x;
+        for (int y = 0; y < my_info.local_ny; ++y) {
+            for (int x = 0; x < my_info.local_nx; ++x) {
+                int idx = y * my_info.local_nx + x;
                 local_ux_flat[idx] = grid.ux(x, y);
                 local_uy_flat[idx] = grid.uy(x, y);
                 local_rho_flat[idx] = grid.rho(x, y);
             }
         }
 
-        // Gather
-        std::vector<int> recvcounts(grid.mpi_size());
-        std::vector<int> displs(grid.mpi_size());
-        int local_size = grid.local_nx() * grid.local_ny();
-
+        std::vector<int> recvcounts(mpi_size);
+        std::vector<int> displs(mpi_size);
+        int local_size = my_info.local_nx * my_info.local_ny;
         MPI_Gather(&local_size, 1, MPI_INT, recvcounts.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-        if (grid.mpi_rank() == 0) {
+        if (mpi_rank == 0) {
             displs[0] = 0;
-            for (int i = 1; i < grid.mpi_size(); ++i) {
-                displs[i] = displs[i - 1] + recvcounts[i - 1];
+            for (int i = 1; i < mpi_size; ++i) {
+                displs[i] = displs[i-1] + recvcounts[i-1];
             }
         }
 
         std::vector<double> recv_ux, recv_uy, recv_rho;
-        if (grid.mpi_rank() == 0) {
-            int total_size = 0;
-            for (int c : recvcounts) total_size += c;
-            recv_ux.resize(total_size);
-            recv_uy.resize(total_size);
-            recv_rho.resize(total_size);
+        if (mpi_rank == 0) {
+            int total = 0;
+            for (int c : recvcounts) total += c;
+            recv_ux.resize(total);
+            recv_uy.resize(total);
+            recv_rho.resize(total);
         }
 
         MPI_Gatherv(local_ux_flat.data(), local_size, MPI_DOUBLE,
@@ -88,38 +206,21 @@ public:
                     recv_rho.data(), recvcounts.data(), displs.data(), MPI_DOUBLE,
                     0, MPI_COMM_WORLD);
 
-        // Reconstruct on rank 0
-        if (grid.mpi_rank() == 0) {
-            for (int rank = 0; rank < grid.mpi_size(); ++rank) {
-                const RankInfo& info = all_info[rank];
+        if (mpi_rank == 0) {
+            for(int rank = 0; rank < mpi_size; ++rank) {
+                const auto& info = all_info[rank];
                 int offset = displs[rank];
-
                 for (int ly = 0; ly < info.local_ny; ++ly) {
                     for (int lx = 0; lx < info.local_nx; ++lx) {
-                        int global_x = info.x_start + lx;
-                        int global_y = info.y_start + ly;
-                        int global_idx = global_y * grid.global_nx() + global_x;
-                        int local_idx = ly * info.local_nx + lx;
-
-                        global_ux[global_idx] = recv_ux[offset + local_idx];
-                        global_uy[global_idx] = recv_uy[offset + local_idx];
-                        global_rho[global_idx] = recv_rho[offset + local_idx];
+                        int g_idx = (info.y_start + ly) * grid.global_nx() + (info.x_start + lx);
+                        int l_idx = ly * info.local_nx + lx;
+                        global_ux[g_idx] = recv_ux[offset + l_idx];
+                        global_uy[g_idx] = recv_uy[offset + l_idx];
+                        global_rho[g_idx] = recv_rho[offset + l_idx];
                     }
                 }
             }
-
-            write_velocity_field(global_ux, global_uy, global_rho, params);
-            write_simulation_params(global_ux, global_uy, params);
-
-            std::cout << "Files written: velocity_field.csv, simulation_params.csv" << std::endl;
         }
-
-        MPI_Barrier(MPI_COMM_WORLD);
-    }
-
-private:
-    static size_t global_idx(int x, int y, int nx) {
-        return static_cast<size_t>(y) * nx + x;
     }
 
     static void write_velocity_field(const std::vector<double>& ux_g,
@@ -133,19 +234,14 @@ private:
         }
 
         file << "x,y,ux,uy,rho,velocity_magnitude\n";
-
         for (int y = 0; y < p.ny; ++y) {
             for (int x = 0; x < p.nx; ++x) {
-                size_t idx = global_idx(x, y, p.nx);
-                const double ux_val = ux_g[idx];
-                const double uy_val = uy_g[idx];
-                const double rho_val = rho_g[idx];
-                const double vel_mag = std::sqrt(ux_val * ux_val + uy_val * uy_val);
-
+                size_t idx = static_cast<size_t>(y) * p.nx + x;
+                double vel_mag = std::sqrt(ux_g[idx] * ux_g[idx] + uy_g[idx] * uy_g[idx]);
                 file << x << "," << y << ","
                      << std::fixed << std::setprecision(8)
-                     << ux_val << "," << uy_val << ","
-                     << rho_val << "," << vel_mag << "\n";
+                     << ux_g[idx] << "," << uy_g[idx] << ","
+                     << rho_g[idx] << "," << vel_mag << "\n";
             }
         }
         file.close();
@@ -161,27 +257,24 @@ private:
             return;
         }
 
-        // Calculate statistics
+        // Calculate velocity statistics
         double max_vel = 0.0;
         double avg_vel = 0.0;
-        int count = 0;
-
         for (int y = 0; y < p.ny; ++y) {
             for (int x = 0; x < p.nx; ++x) {
-                size_t idx = global_idx(x, y, p.nx);
+                size_t idx = static_cast<size_t>(y) * p.nx + x;
                 double vel = std::sqrt(ux_g[idx] * ux_g[idx] + uy_g[idx] * uy_g[idx]);
                 max_vel = std::max(max_vel, vel);
                 avg_vel += vel;
-                count++;
             }
         }
-        avg_vel /= count;
+        avg_vel /= (p.nx * p.ny);
 
         file << "parameter,value\n"
              << "nx," << p.nx << "\n"
              << "ny," << p.ny << "\n"
-             << "tau," << p.tau << "\n"
-             << "nu," << std::fixed << std::setprecision(8) << p.nu() << "\n"
+             << "tau," << std::fixed << std::setprecision(8) << p.tau << "\n"
+             << "nu," << p.nu() << "\n"
              << "inlet_velocity," << p.inlet_velocity << "\n"
              << "num_timesteps," << p.num_timesteps << "\n"
              << "reynolds_number," << p.reynolds() << "\n"
@@ -192,6 +285,55 @@ private:
              << "avg_velocity," << avg_vel << "\n";
 
         file.close();
+        std::cout << "  simulation_params.csv written\n";
+    }
+
+    static void calculate_time_averaged_drag() {
+        std::ifstream forces_in("forces.csv");
+        if (!forces_in) {
+            std::cerr << "Warning: Could not read forces.csv for averaging\n";
+            return;
+        }
+
+        std::string header;
+        std::getline(forces_in, header);  // Skip header
+
+        double sum_cd = 0.0, sum_cl = 0.0;
+        double max_cd = -1e9, min_cd = 1e9;
+        double max_cl = -1e9, min_cl = 1e9;
+        int count = 0;
+        int skip_initial = 1000;  // Skip initial transient
+
+        std::string line;
+        while (std::getline(forces_in, line)) {
+            int timestep;
+            double fx, fy, cd, cl;
+            if (sscanf(line.c_str(), "%d,%lf,%lf,%lf,%lf",
+                      &timestep, &fx, &fy, &cd, &cl) == 5) {
+                if (timestep > skip_initial) {
+                    sum_cd += cd;
+                    sum_cl += cl;
+                    max_cd = std::max(max_cd, cd);
+                    min_cd = std::min(min_cd, cd);
+                    max_cl = std::max(max_cl, cl);
+                    min_cl = std::min(min_cl, cl);
+                    count++;
+                }
+            }
+        }
+        forces_in.close();
+
+        if (count > 0) {
+            double avg_cd = sum_cd / count;
+            double avg_cl = sum_cl / count;
+
+            std::cout << "\n=== Time-Averaged Force Coefficients ===\n";
+            std::cout << "  Mean C_D = " << std::fixed << std::setprecision(6) << avg_cd << "\n";
+            std::cout << "  C_D range: [" << min_cd << ", " << max_cd << "]\n";
+            std::cout << "  Mean C_L = " << avg_cl << "\n";
+            std::cout << "  C_L range: [" << min_cl << ", " << max_cl << "]\n";
+            std::cout << "  (Averaged over " << count << " samples)\n";
+        }
     }
 };
 

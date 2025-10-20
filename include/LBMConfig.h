@@ -34,13 +34,13 @@ namespace LBM {
     constexpr std::array<int, Q> OPPOSITE = {0, 3, 4, 1, 2, 7, 8, 5, 6};
 
     struct SimulationParams {
-        double tau = 0.6;
+        double tau = 0.7;
         // double force_x = 5e-5;
         // double force_y = 0.0;
-        double inlet_velocity = 0.02;
+        double inlet_velocity = 0.28;
         int nx = 1024;
         int ny = 256;
-        int num_timesteps = 200000;
+        int num_timesteps = 400000;
         int output_frequency = 1000;
 
         // cylinder parameters

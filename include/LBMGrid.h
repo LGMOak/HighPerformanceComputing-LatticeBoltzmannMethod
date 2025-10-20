@@ -184,12 +184,12 @@ namespace LBM {
         void initialise(double inlet_u) {
             alignas(32) double f_eq_temp[8];
 
-            // CRITICAL: Initialize ALL cells (interior + ghosts) for BOTH buffers
+            // Initialise all cells (interior + ghosts) for both buffers
             // This prevents garbage values in ghost cells on first timestep
         #pragma omp parallel for schedule(static) private(f_eq_temp)
             for (int gy = 0; gy < total_ny_; ++gy) {
                 for (int gx = 0; gx < total_nx_; ++gx) {
-                    // Initialize with uniform inlet flow everywhere
+                    // initialise with uniform inlet flow everywhere
                     double rho_init = 1.0;
                     double ux_init = inlet_u;
                     double uy_init = 0.0;
