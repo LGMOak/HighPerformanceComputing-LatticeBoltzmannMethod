@@ -13,14 +13,6 @@ int main(int argc, char *argv[]) {
         // Configure simulation parameters
         LBM::SimulationParams params;
 
-        // Simulation parameters
-        params.nx = 1024;
-        params.ny = 256;
-        params.num_timesteps = 80000;
-        params.output_frequency = 1000;
-        params.tau = 0.6;
-        params.force_x = 4e-7;
-
         // Create solver
         LBM::Solver solver(params);
         solver.initialise();
@@ -28,6 +20,7 @@ int main(int argc, char *argv[]) {
         // Run simulation
         if (!solver.run()) {
             std::cerr << "LBM simulation failed to reach equilibrium" << std::endl;
+            MPI_Finalize();
             return 1;
         }
 

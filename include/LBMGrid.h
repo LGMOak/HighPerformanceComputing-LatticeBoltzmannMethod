@@ -50,6 +50,7 @@ namespace LBM {
         alignas(32) std::vector<double> recv_buffer_west_;
 
         std::vector<MPI_Request> mpi_requests_;
+        std::vector<bool> is_solid_;
 
     public:
         Grid(int nx, int ny) : global_nx_(nx), global_ny_(ny) {
@@ -71,6 +72,7 @@ namespace LBM {
             rho_.resize(interior_size, 1.0);
             ux_.resize(interior_size, 0.0);
             uy_.resize(interior_size, 0.0);
+            is_solid_.resize(interior_size, false);
 
             // allocate communication buffers for full exchange (all 9 populations per cell)
             const int EW_BUF_SIZE = local_ny_ * Q;
@@ -139,28 +141,110 @@ namespace LBM {
         int global_ny() const { return global_ny_; }
         int mpi_size() const { return mpi_size_; }
 
-        void initialise() {
-            alignas(32) double f_eq_temp[8];
+        inline bool is_solid(int x, int y) const {
+            return is_solid_[get_interior_index(x, y)];
+        }
 
-            // static schedule means even work load (minimal overhead)
-            // f_eq_temp is private so every thread attains own copy for manipulation avoids race conditions
-            // collapse(2) combines both loops into single iteration space
-            #pragma omp parallel for schedule(static) private(f_eq_temp) collapse(2)
+        bool is_left_boundary() const { return rank_x_ == 0; }
+        bool is_right_boundary() const { return rank_x_ == px_ - 1; }
+
+        void setup_geometry(const SimulationParams& params) {
+            int cyl_x = params.get_cylinder_x();
+            int cyl_y = params.get_cylinder_y();
+            int cyl_r = params.get_cylinder_radius_cells();
+
+            int local_solid_count = 0;
+#pragma omp parallel for schedule(static) reduction(+:local_solid_count)
             for (int y = 0; y < local_ny_; ++y) {
                 for (int x = 0; x < local_nx_; ++x) {
-                    int gx = x + GHOST_LAYERS;
-                    int gy = y + GHOST_LAYERS;
+                    int global_x = x_start_ + x;
+                    int global_y = y_start_ + y;
 
-                    double* f_ptr = f_current_ptr(gx, gy);
-                    f_ptr[0] = equilibrium_scalar(rho(x, y), ux(x, y), uy(x, y));
-                    equilibrium_simd(rho(x, y), ux(x, y), uy(x, y), f_eq_temp);
-                    _mm256_storeu_pd(&f_ptr[1], _mm256_loadu_pd(&f_eq_temp[0]));
-                    _mm256_storeu_pd(&f_ptr[5], _mm256_loadu_pd(&f_eq_temp[4]));
+                    double dx = global_x - cyl_x;
+                    double dy = global_y - cyl_y;
+                    double dist_sq = dx*dx + dy*dy;
+
+                    if (dist_sq <= cyl_r * cyl_r) {
+                        is_solid_[get_interior_index(x, y)] = true;
+                        local_solid_count++;
+                    }
+                }
+            }
+            int global_solid_count;
+            MPI_Reduce(&local_solid_count, &global_solid_count, 1, MPI_INT,
+                      MPI_SUM, 0, MPI_COMM_WORLD);
+
+            if (mpi_rank_ == 0) {
+                printf("  Cylinder: center=(%d,%d), radius=%d cells\n",
+                       cyl_x, cyl_y, cyl_r);
+                printf("  Solid cells: %d\n", global_solid_count);
+            }
+        }
+
+        void initialise(double inlet_u) {
+            alignas(32) double f_eq_temp[8];
+
+            // CRITICAL: Initialize ALL cells (interior + ghosts) for BOTH buffers
+            // This prevents garbage values in ghost cells on first timestep
+        #pragma omp parallel for schedule(static) private(f_eq_temp)
+            for (int gy = 0; gy < total_ny_; ++gy) {
+                for (int gx = 0; gx < total_nx_; ++gx) {
+                    // Initialize with uniform inlet flow everywhere
+                    double rho_init = 1.0;
+                    double ux_init = inlet_u;
+                    double uy_init = 0.0;
+
+                    // Get pointers to both buffers
+                    double* f_curr = f_current_ptr(gx, gy);
+                    double* f_nxt = f_next_ptr(gx, gy);
+
+                    // Compute equilibrium once
+                    f_curr[0] = equilibrium_scalar(rho_init, ux_init, uy_init);
+                    equilibrium_simd(rho_init, ux_init, uy_init, f_eq_temp);
+                    _mm256_storeu_pd(&f_curr[1], _mm256_loadu_pd(&f_eq_temp[0]));
+                    _mm256_storeu_pd(&f_curr[5], _mm256_loadu_pd(&f_eq_temp[4]));
+
+                    // Copy to f_next
+                    for (int i = 0; i < Q; ++i) {
+                        f_nxt[i] = f_curr[i];
+                    }
+                }
+            }
+
+            // Set interior macroscopic quantities and handle solid cells
+        #pragma omp parallel for schedule(static) collapse(2)
+            for (int y = 0; y < local_ny_; ++y) {
+                for (int x = 0; x < local_nx_; ++x) {
+                    if (!is_solid(x, y)) {
+                        ux(x, y) = inlet_u;
+                        uy(x, y) = 0.0;
+                        rho(x, y) = 1.0;
+                    } else {
+                        // Solid cells: zero velocity
+                        ux(x, y) = 0.0;
+                        uy(x, y) = 0.0;
+                        rho(x, y) = 1.0;
+
+                        // Initialize solid cell distributions to zero velocity equilibrium
+                        int gx = x + GHOST_LAYERS;
+                        int gy = y + GHOST_LAYERS;
+                        double* f_curr = f_current_ptr(gx, gy);
+                        double* f_nxt = f_next_ptr(gx, gy);
+
+                        f_curr[0] = equilibrium_scalar(1.0, 0.0, 0.0);
+                        equilibrium_simd(1.0, 0.0, 0.0, f_eq_temp);
+                        _mm256_storeu_pd(&f_curr[1], _mm256_loadu_pd(&f_eq_temp[0]));
+                        _mm256_storeu_pd(&f_curr[5], _mm256_loadu_pd(&f_eq_temp[4]));
+
+                        for (int i = 0; i < Q; ++i) {
+                            f_nxt[i] = f_curr[i];
+                        }
+                    }
                 }
             }
         }
 
-        // echanges 9 velocity vectors in ghost cells
+        // exchanges 9 velocity vectors in ghost cells
         void exchange_ghost_cells() {
             pack_ghost_cells();
 
@@ -259,10 +343,10 @@ namespace LBM {
         }
 
     private:
-        void initialise_2d_topology() {
+        void initialise_2d_topology() {// dnfnwebiew
             find_optimal_decomposition(mpi_size_, global_nx_, global_ny_, px_, py_);
             int dims[2] = {px_, py_};
-            int periods[2] = {1, 0};  // Periodic in x, walls in y
+            int periods[2] = {0, 0};  // no more periodic boundary condotiitions
             int reorder = 1;
             MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, reorder, &cart_comm_);
             MPI_Comm_rank(cart_comm_, &mpi_rank_);
@@ -333,8 +417,7 @@ namespace LBM {
                 buf_idx = 0;
                 for (int x = 0; x < local_nx_; ++x) {
                     int gx = x + G;
-                    // CORRECTED LINE:
-                    int gy = local_ny_ - 1 + G; // Use the TOP row
+                    int gy = local_ny_ - 1 + G;
                     for (int i = 0; i < Q; ++i) {
                         send_buffer_north_[buf_idx++] = f_next(gx, gy, i);
                     }
@@ -346,7 +429,7 @@ namespace LBM {
                 buf_idx = 0;
                 for (int x = 0; x < local_nx_; ++x) {
                     int gx = x + G;
-                    int gy = G; // Use the BOTTOM row
+                    int gy = G;
                     for (int i = 0; i < Q; ++i) {
                         send_buffer_south_[buf_idx++] = f_next(gx, gy, i);
                     }

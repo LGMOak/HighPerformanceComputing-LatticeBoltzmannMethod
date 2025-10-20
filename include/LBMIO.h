@@ -15,14 +15,15 @@ class IOManager {
 public:
     static void write_results(const Grid& grid, const SimulationParams& params) {
         if (grid.mpi_rank() == 0) {
-            std::cout << "\nGathering results and writing output data..." << std::endl;
+            std::cout << "\nGathering results..." << std::endl;
         }
 
-        // --- Gather data with spatial information ---
-        std::vector<double> global_ux, global_uy;
+        // Gather velocity and density data
+        std::vector<double> global_ux, global_uy, global_rho;
         if (grid.mpi_rank() == 0) {
             global_ux.resize(grid.global_nx() * grid.global_ny(), 0.0);
             global_uy.resize(grid.global_nx() * grid.global_ny(), 0.0);
+            global_rho.resize(grid.global_nx() * grid.global_ny(), 1.0);
         }
 
         struct RankInfo {
@@ -35,25 +36,26 @@ public:
         my_info.x_start = grid.x_start();
         my_info.y_start = grid.y_start();
 
-        // Gather all rank info to root
         std::vector<RankInfo> all_info(grid.mpi_size());
         MPI_Gather(&my_info, sizeof(RankInfo), MPI_BYTE,
                    all_info.data(), sizeof(RankInfo), MPI_BYTE,
                    0, MPI_COMM_WORLD);
 
-        // Each rank prepares flat arrays
+        // Prepare flat arrays
         std::vector<double> local_ux_flat(grid.local_nx() * grid.local_ny());
         std::vector<double> local_uy_flat(grid.local_nx() * grid.local_ny());
+        std::vector<double> local_rho_flat(grid.local_nx() * grid.local_ny());
 
         for (int y = 0; y < grid.local_ny(); ++y) {
             for (int x = 0; x < grid.local_nx(); ++x) {
                 int idx = y * grid.local_nx() + x;
                 local_ux_flat[idx] = grid.ux(x, y);
                 local_uy_flat[idx] = grid.uy(x, y);
+                local_rho_flat[idx] = grid.rho(x, y);
             }
         }
 
-        // Gather data in rank order
+        // Gather
         std::vector<int> recvcounts(grid.mpi_size());
         std::vector<int> displs(grid.mpi_size());
         int local_size = grid.local_nx() * grid.local_ny();
@@ -67,13 +69,13 @@ public:
             }
         }
 
-        // Temporary receive buffers
-        std::vector<double> recv_ux, recv_uy;
+        std::vector<double> recv_ux, recv_uy, recv_rho;
         if (grid.mpi_rank() == 0) {
             int total_size = 0;
             for (int c : recvcounts) total_size += c;
             recv_ux.resize(total_size);
             recv_uy.resize(total_size);
+            recv_rho.resize(total_size);
         }
 
         MPI_Gatherv(local_ux_flat.data(), local_size, MPI_DOUBLE,
@@ -82,14 +84,16 @@ public:
         MPI_Gatherv(local_uy_flat.data(), local_size, MPI_DOUBLE,
                     recv_uy.data(), recvcounts.data(), displs.data(), MPI_DOUBLE,
                     0, MPI_COMM_WORLD);
+        MPI_Gatherv(local_rho_flat.data(), local_size, MPI_DOUBLE,
+                    recv_rho.data(), recvcounts.data(), displs.data(), MPI_DOUBLE,
+                    0, MPI_COMM_WORLD);
 
-        // --- CRITICAL: Rank 0 reconstructs spatial layout ---
+        // Reconstruct on rank 0
         if (grid.mpi_rank() == 0) {
             for (int rank = 0; rank < grid.mpi_size(); ++rank) {
                 const RankInfo& info = all_info[rank];
                 int offset = displs[rank];
 
-                // Copy this rank's data to correct global positions
                 for (int ly = 0; ly < info.local_ny; ++ly) {
                     for (int lx = 0; lx < info.local_nx; ++lx) {
                         int global_x = info.x_start + lx;
@@ -99,19 +103,17 @@ public:
 
                         global_ux[global_idx] = recv_ux[offset + local_idx];
                         global_uy[global_idx] = recv_uy[offset + local_idx];
+                        global_rho[global_idx] = recv_rho[offset + local_idx];
                     }
                 }
             }
 
-            write_velocity_field(global_ux, global_uy, params);
-            write_velocity_profile(global_ux, params);
-            write_simulation_params(global_ux, params);
+            write_velocity_field(global_ux, global_uy, global_rho, params);
+            write_simulation_params(global_ux, global_uy, params);
 
-            std::cout << "Files written: velocity_field.csv, velocity_profile.csv, simulation_params.csv" << std::endl;
-            std::cout << "Visualize: python3 visualise_results.py" << std::endl;
+            std::cout << "Files written: velocity_field.csv, simulation_params.csv" << std::endl;
         }
 
-        // Barrier to ensure all ranks wait for IO to complete
         MPI_Barrier(MPI_COMM_WORLD);
     }
 
@@ -122,6 +124,7 @@ private:
 
     static void write_velocity_field(const std::vector<double>& ux_g,
                                      const std::vector<double>& uy_g,
+                                     const std::vector<double>& rho_g,
                                      const SimulationParams& p) {
         std::ofstream file("velocity_field.csv");
         if (!file) {
@@ -129,42 +132,28 @@ private:
             return;
         }
 
-        file << "x,y,ux,uy,velocity_magnitude\n";
+        file << "x,y,ux,uy,rho,velocity_magnitude\n";
 
         for (int y = 0; y < p.ny; ++y) {
             for (int x = 0; x < p.nx; ++x) {
                 size_t idx = global_idx(x, y, p.nx);
                 const double ux_val = ux_g[idx];
                 const double uy_val = uy_g[idx];
+                const double rho_val = rho_g[idx];
                 const double vel_mag = std::sqrt(ux_val * ux_val + uy_val * uy_val);
+
                 file << x << "," << y << ","
                      << std::fixed << std::setprecision(8)
-                     << ux_val << "," << uy_val << "," << vel_mag << "\n";
+                     << ux_val << "," << uy_val << ","
+                     << rho_val << "," << vel_mag << "\n";
             }
         }
         file.close();
-        std::cout << "  ✓ velocity_field.csv written\n";
-    }
-
-    static void write_velocity_profile(const std::vector<double>& ux_g,
-                                       const SimulationParams& p) {
-        std::ofstream file("velocity_profile.csv");
-        if (!file) {
-            std::cerr << "ERROR: Cannot write velocity_profile.csv\n";
-            return;
-        }
-
-        file << "y,ux\n";
-        const int mid_x = p.nx / 2;
-        for (int y = 0; y < p.ny; ++y) {
-            file << y << "," << std::fixed << std::setprecision(8)
-                 << ux_g[global_idx(mid_x, y, p.nx)] << "\n";
-        }
-        file.close();
-        std::cout << "  ✓ velocity_profile.csv written\n";
+        std::cout << "  velocity_field.csv written\n";
     }
 
     static void write_simulation_params(const std::vector<double>& ux_g,
+                                        const std::vector<double>& uy_g,
                                         const SimulationParams& p) {
         std::ofstream file("simulation_params.csv");
         if (!file) {
@@ -172,46 +161,37 @@ private:
             return;
         }
 
-        const double kinematic_viscosity = p.nu();
-        const double channel_height = static_cast<double>(p.ny);
-        const double body_force = p.force_x;
-        const double u_max_theory = (body_force * channel_height * channel_height) / (8.0 * kinematic_viscosity);
-        const double u_avg_theory = (2.0 / 3.0) * u_max_theory;
+        // Calculate statistics
+        double max_vel = 0.0;
+        double avg_vel = 0.0;
+        int count = 0;
 
-        double sum_ux = 0.0, max_ux_sim = 0.0;
-        const int mid_x = p.nx / 2;
         for (int y = 0; y < p.ny; ++y) {
-            const double current_ux = ux_g[global_idx(mid_x, y, p.nx)];
-            sum_ux += current_ux;
-            max_ux_sim = std::max(max_ux_sim, current_ux);
+            for (int x = 0; x < p.nx; ++x) {
+                size_t idx = global_idx(x, y, p.nx);
+                double vel = std::sqrt(ux_g[idx] * ux_g[idx] + uy_g[idx] * uy_g[idx]);
+                max_vel = std::max(max_vel, vel);
+                avg_vel += vel;
+                count++;
+            }
         }
-        const double u_avg_sim = sum_ux / static_cast<double>(p.ny);
-        const double reynolds_number = (u_avg_sim * channel_height) / kinematic_viscosity;
+        avg_vel /= count;
 
-        double sum_squared_error = 0.0;
-        for (int y = 0; y < p.ny; ++y) {
-            const double y_pos = static_cast<double>(y);
-            const double u_theory = (body_force / (2.0 * kinematic_viscosity)) * y_pos * (channel_height - 1.0 - y_pos);
-            const double error = ux_g[global_idx(mid_x, y, p.nx)] - u_theory;
-            sum_squared_error += error * error;
-        }
-        const double rmse = std::sqrt(sum_squared_error / static_cast<double>(p.ny));
-
-        file << "parameter,value,analytical_value,error\n"
-             << "nx," << p.nx << ",\n"
-             << "ny," << p.ny << ",\n"
-             << "tau," << p.tau << ",\n"
-             << "nu," << std::fixed << std::setprecision(8) << p.nu() << ",\n"
-             << "force_x," << std::scientific << p.force_x << ",\n"
-             << "num_timesteps," << p.num_timesteps << ",\n"
-             << "max_velocity," << std::fixed << std::setprecision(8)
-             << max_ux_sim << "," << u_max_theory << "," << (max_ux_sim - u_max_theory) << "\n"
-             << "avg_velocity," << u_avg_sim << "," << u_avg_theory << "," << (u_avg_sim - u_avg_theory) << "\n"
-             << "reynolds_number," << reynolds_number << ",\n"
-             << "rmse_from_theory," << rmse << ",\n";
+        file << "parameter,value\n"
+             << "nx," << p.nx << "\n"
+             << "ny," << p.ny << "\n"
+             << "tau," << p.tau << "\n"
+             << "nu," << std::fixed << std::setprecision(8) << p.nu() << "\n"
+             << "inlet_velocity," << p.inlet_velocity << "\n"
+             << "num_timesteps," << p.num_timesteps << "\n"
+             << "reynolds_number," << p.reynolds() << "\n"
+             << "cylinder_x," << p.get_cylinder_x() << "\n"
+             << "cylinder_y," << p.get_cylinder_y() << "\n"
+             << "cylinder_radius," << p.get_cylinder_radius_cells() << "\n"
+             << "max_velocity," << max_vel << "\n"
+             << "avg_velocity," << avg_vel << "\n";
 
         file.close();
-        std::cout << "  ✓ simulation_params.csv written\n";
     }
 };
 
