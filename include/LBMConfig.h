@@ -34,20 +34,20 @@ namespace LBM {
     constexpr std::array<int, Q> OPPOSITE = {0, 3, 4, 1, 2, 7, 8, 5, 6};
 
     struct SimulationParams {
-        double tau = 0.7;
-        // double force_x = 5e-5;
-        // double force_y = 0.0;
-        double inlet_velocity = 0.28;
-        int nx = 1024;
-        int ny = 256;
-        int num_timesteps = 400000;
-        int output_frequency = 1000;
+        double tau = 0.6;
+        double inlet_velocity = 0.01333;
+        int nx = 2048;
+        int ny = 512;
+        int num_timesteps = 120000;
+        int output_frequency = 140;
 
         // cylinder parameters
         double cylinder_x = 0.2;
         double cylinder_y = 0.5;
         double cylinder_radius = 0.05;
 
+        // vtk file output
+        int vtk_start_step = 0;
 
         // Derived parameters
         double nu() const { return (tau - 0.5) / 3.0; }

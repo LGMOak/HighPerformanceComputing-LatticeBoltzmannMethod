@@ -4,27 +4,19 @@
 #include <iostream>
 #include <mpi.h>
 
-#include "../include/LBMConfig.h"
-#include "../include/LBMSolver.h"
-#include "../include/LBMIO.h" // Make sure this is included
-#include <iostream>
-#include <mpi.h>
-
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
     try {
         LBM::SimulationParams params;
-        LBM::Solver solver(params);
-        LBM::IOManager io_manager; // 1. Create the IOManager instance here
+        LBM::Solver solver(params, true);
+        LBM::IOManager io_manager;
 
         solver.initialise();
 
-        // 2. Pass the IOManager to the run method
         bool success = solver.run(io_manager);
 
         if (success) {
-            // 3. Call the final write method after the simulation is complete
             io_manager.write_final_results(solver.get_grid(), solver.get_params());
             if (solver.get_grid().mpi_rank() == 0) {
                 std::cout << "\nSimulation completed successfully!" << std::endl;

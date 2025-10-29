@@ -17,6 +17,10 @@ private:
     int mpi_rank_;
     bool force_file_open_;
 
+    static size_t global_idx(int x, int y, int nx) {
+        return static_cast<size_t>(y) * nx + x;
+    }
+
 public:
     IOManager() : mpi_rank_(-1), force_file_open_(false) {
         MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank_);
@@ -35,6 +39,64 @@ public:
         if (mpi_rank_ == 0 && force_file_open_) {
             force_file_.close();
         }
+    }
+
+    static void write_vtk_timestep(const std::vector<double>& ux_g,
+                                const std::vector<double>& uy_g,
+                                const std::vector<double>& rho_g,
+                                const SimulationParams& p,
+                                int timestep) {
+        char filename[256];
+        snprintf(filename, sizeof(filename), "vtk_output/lbm_%06d.vtk", timestep);
+
+        std::ofstream file(filename);
+        if (!file) {
+            std::cerr << "ERROR: Cannot write " << filename << "\n";
+            return;
+        }
+
+        // VTK Legacy format header
+        file << "# vtk DataFile Version 3.0\n";
+        file << "LBM Flow Timestep " << timestep << "\n";
+        file << "ASCII\n";
+        file << "DATASET STRUCTURED_POINTS\n";
+        file << "DIMENSIONS " << p.nx << " " << p.ny << " 1\n";
+        file << "ORIGIN 0 0 0\n";
+        file << "SPACING 1 1 1\n";
+        file << "POINT_DATA " << (p.nx * p.ny) << "\n";
+
+        // Velocity vectors
+        file << "VECTORS velocity double\n";
+        for (int y = 0; y < p.ny; ++y) {
+            for (int x = 0; x < p.nx; ++x) {
+                size_t idx = global_idx(x, y, p.nx);
+                file << std::fixed << std::setprecision(8)
+                     << ux_g[idx] << " " << uy_g[idx] << " 0.0\n";
+            }
+        }
+
+        // Velocity magnitude
+        file << "\nSCALARS velocity_magnitude double\n";
+        file << "LOOKUP_TABLE default\n";
+        for (int y = 0; y < p.ny; ++y) {
+            for (int x = 0; x < p.nx; ++x) {
+                size_t idx = global_idx(x, y, p.nx);
+                double vel_mag = std::sqrt(ux_g[idx] * ux_g[idx] + uy_g[idx] * uy_g[idx]);
+                file << std::fixed << std::setprecision(8) << vel_mag << "\n";
+            }
+        }
+
+        // Density
+        file << "\nSCALARS density double\n";
+        file << "LOOKUP_TABLE default\n";
+        for (int y = 0; y < p.ny; ++y) {
+            for (int x = 0; x < p.nx; ++x) {
+                size_t idx = global_idx(x, y, p.nx);
+                file << std::fixed << std::setprecision(8) << rho_g[idx] << "\n";
+            }
+        }
+
+        file.close();
     }
 
     // Call this after collision but before streamiing
