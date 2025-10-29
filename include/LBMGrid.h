@@ -160,6 +160,20 @@ namespace LBM {
             }
         }
 
+        void initialise_ghost_cells() {
+            const int G = GHOST_LAYERS;
+            
+            // Copy f_current to f_next so we have data to exchange
+            const size_t total_size = static_cast<size_t>(total_nx_) * total_ny_ * Q;
+            std::memcpy(f_next_, f_current_, total_size * sizeof(double));
+            
+            // Exchange ghost cells
+            exchange_ghost_cells();
+            
+            // Copy back to f_current
+            std::memcpy(f_current_, f_next_, total_size * sizeof(double));
+        }
+
         // echanges 9 velocity vectors in ghost cells
         void exchange_ghost_cells() {
             pack_ghost_cells();

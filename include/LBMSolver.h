@@ -26,6 +26,7 @@ namespace LBM {
                       << ", force_x=" << std::fixed << std::setprecision(7) << params_.force_x << std::endl;
             }
             grid_.initialise();
+            grid_.initialise_ghost_cells();
         }
 
         bool run() {
@@ -61,57 +62,52 @@ namespace LBM {
 
     private:
         void collision_step() {
-            const double tau_inv = 1.0 / params_.tau;
-            const int GHOST = 1;
+    const double tau_inv = 1.0 / params_.tau;
+    const int GHOST = 1;
 
-            // even workload - combines nested loops
-#pragma omp parallel for schedule(static) collapse(2)
-            for (int y = 0; y < grid_.local_ny(); ++y) {
-                for (int x = 0; x < grid_.local_nx(); ++x) {
-                    int gx = x + GHOST;
-                    int gy = y + GHOST;
+    #pragma omp parallel for schedule(static) collapse(2)
+    for (int y = 0; y < grid_.local_ny(); ++y) {
+        for (int x = 0; x < grid_.local_nx(); ++x) {
+            int gx = x + GHOST;
+            int gy = y + GHOST;
 
-                    double* f_curr = grid_.f_current_ptr(gx, gy);
-                    double* f_next = grid_.f_next_ptr(gx, gy);
+            double* f_curr = grid_.f_current_ptr(gx, gy);
+            double* f_next = grid_.f_next_ptr(gx, gy);
 
-                    // calculate density and macroscopic momentum
-                    double rho_val = 0.0, ux_val = 0.0, uy_val = 0.0;
-                    for(int i = 0; i < Q; ++i) {
-                        rho_val += f_curr[i];
-                        ux_val += VELOCITIES[i][0] * f_curr[i];
-                        uy_val += VELOCITIES[i][1] * f_curr[i];
-                    }
+            // Calculate density and RAW momentum (no force yet)
+            double rho_val = 0.0, ux_val = 0.0, uy_val = 0.0;
+            for(int i = 0; i < Q; ++i) {
+                rho_val += f_curr[i];
+                ux_val += VELOCITIES[i][0] * f_curr[i];
+                uy_val += VELOCITIES[i][1] * f_curr[i];
+            }
 
-                    // apply the force to momentum
-                    ux_val += 0.5 * params_.force_x;
-                    uy_val += 0.5 * params_.force_y;
+            // Velocity for equilibrium
+            double ux_eq = ux_val / rho_val + 0.5 * params_.force_x / rho_val;
+            double uy_eq = uy_val / rho_val + 0.5 * params_.force_y / rho_val;
 
-                    // final velocity
-                    ux_val /= rho_val;
-                    uy_val /= rho_val;
+            // Store velocity
+            grid_.rho(x, y) = rho_val;
+            grid_.ux(x, y) = ux_eq;
+            grid_.uy(x, y) = uy_eq;
 
-                    // update the grid with the new macroscopic values
-                    grid_.rho(x, y) = rho_val;
-                    grid_.ux(x, y) = ux_val;
-                    grid_.uy(x, y) = uy_val;
+            // Compute equilibrium
+            double u_sq = ux_eq * ux_eq + uy_eq * uy_eq;
+            for(int i = 0; i < Q; ++i) {
+                double ci_u = VELOCITIES[i][0] * ux_eq + VELOCITIES[i][1] * uy_eq;
+                double f_eq_i = WEIGHTS[i] * rho_val * (1.0 + 3.0 * ci_u + 4.5 * ci_u * ci_u - 1.5 * u_sq);
 
-                    // Compute equilibrium distribution with guo forcing
-                    double u_sq = ux_val * ux_val + uy_val * uy_val;
-                    for(int i = 0; i < Q; ++i) {
-                        double ci_u = VELOCITIES[i][0] * ux_val + VELOCITIES[i][1] * uy_val;
+                // Guo force term
+                double ci_minus_u_dot_F = (VELOCITIES[i][0] - ux_eq) * params_.force_x 
+                                        + (VELOCITIES[i][1] - uy_eq) * params_.force_y;
+                double force_term = (1.0 - 0.5 * tau_inv) * 3.0 * WEIGHTS[i] * ci_minus_u_dot_F;
 
-                        // standard equilibrium
-                        double f_eq_i = WEIGHTS[i] * rho_val * (1.0 + 3.0 * ci_u + 4.5 * ci_u * ci_u - 1.5 * u_sq);
-
-                        // Gup force term
-                        double force_term = 3.0 * WEIGHTS[i] * (VELOCITIES[i][0] * params_.force_x + VELOCITIES[i][1] * params_.force_y);
-
-                        // BGK collision with force
-                        f_next[i] = f_curr[i] - tau_inv * (f_curr[i] - f_eq_i - force_term);
-                    }
-                }
+                // BGK collision with force
+                f_next[i] = f_curr[i] - tau_inv * (f_curr[i] - f_eq_i) + force_term;
             }
         }
+    }
+}
 
         void streaming_step() {
             const int GHOST = 1;

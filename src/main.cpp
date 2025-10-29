@@ -16,8 +16,8 @@ int main(int argc, char *argv[]) {
         // Simulation parameters
         params.nx = 1024;
         params.ny = 256;
-        params.num_timesteps = 80000;
-        params.output_frequency = 1000;
+        params.num_timesteps = 500000;
+        params.output_frequency = 2000;
         params.tau = 0.6;
         params.force_x = 4e-7;
 
