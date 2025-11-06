@@ -134,7 +134,7 @@ namespace LBM {
                     int gx = x + GHOST;
                     int gy = y + GHOST;
 
-                    // Pull scheme: read from upstream neighbors
+                    // Pull scheme: read from upstream neighbours
                     for (int i = 0; i < Q; ++i) {
                         int src_x = gx - VELOCITIES[i][0];
                         int src_y = gy - VELOCITIES[i][1];
@@ -149,7 +149,7 @@ namespace LBM {
 
 #pragma omp parallel
             {
-                // 1. Wall boundaries (bounce-back)
+                // Wall boundaries (bounce-back)
                 if (grid_.is_bottom_boundary()) {
 #pragma omp for schedule(static) nowait
                     for (int x = 0; x < grid_.local_nx(); ++x) {
@@ -175,7 +175,7 @@ namespace LBM {
                     }
                 }
 
-                // 2. Inlet boundary (Zou-He velocity BC)
+                // Inlet boundary (Zou-He velocity BC)
                 if (grid_.is_left_boundary()) {
 #pragma omp for schedule(static) nowait
                     for (int y = 0; y < grid_.local_ny(); ++y) {
@@ -206,7 +206,7 @@ namespace LBM {
                     }
                 }
 
-                // 3. Outlet boundary (Zou-He pressure BC or convective)
+                // Outlet boundary (Zou-He pressure BC or convective)
                 if (grid_.is_right_boundary()) {
 #pragma omp for schedule(static) nowait
                     for (int y = 0; y < grid_.local_ny(); ++y) {
@@ -235,8 +235,8 @@ namespace LBM {
                     }
                 }
 
-                // 4. Cylinder bounce-back (must be done AFTER all other BCs)
-                // Note: Can't use collapse(2) here due to temp array
+                // Cylinder bounce-back after other BCs
+                // don't use collapse(2) here due to temp array
 #pragma omp for schedule(static)
                 for (int y = 0; y < grid_.local_ny(); ++y) {
                     for (int x = 0; x < grid_.local_nx(); ++x) {
@@ -263,6 +263,9 @@ namespace LBM {
                 }
             }
         }
+        /*
+         * Information needed for ParaView animation data
+         */
         void write_vtk_frame(int timestep) {
             std::vector<double> global_ux, global_uy, global_rho;
 

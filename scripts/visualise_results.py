@@ -1,17 +1,21 @@
+"""
+Comprehensive LBM Cylinder Flow Visualization
+Generates a 4-panel figure for analysis:
+1. Velocity Magnitude Contour
+2. Streamlines
+3. Vorticity Field
+4. Pressure Field
+
+Note: AI assistance was used to help structure the pandas data
+loading, scipy peak-finding logic, and matplotlib plotting.
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import sys
 
 def main():
-    """
-    Comprehensive LBM Cylinder Flow Visualization
-    Generates a 4-panel figure for analysis:
-    1. Velocity Magnitude Contour
-    2. Streamlines
-    3. Vorticity Field
-    4. Pressure Field
-    """
     try:
         velocity_data = pd.read_csv('velocity_field.csv')
         params = pd.read_csv('simulation_params.csv', index_col='parameter')['value']

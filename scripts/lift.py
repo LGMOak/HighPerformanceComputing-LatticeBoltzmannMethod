@@ -1,3 +1,11 @@
+"""
+This script analyzes the LBM simulation data from forces.csv
+to plot the lift coefficient and calculate the Strouhal number.
+
+Note: AI assistance was used to help structure the pandas data
+loading, scipy peak-finding logic, and matplotlib plotting.
+"""
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -5,11 +13,6 @@ from scipy.signal import find_peaks
 import seaborn as sns  # <-- 1. Import Seaborn
 
 def analyze_simulation_data():
-    """
-    Analyzes LBM simulation data to plot the lift coefficient
-    and calculate the Strouhal number.
-    """
-
     forces_file = 'forces.csv'
     params_file = 'simulation_params.csv'
 

@@ -15,7 +15,7 @@ namespace LBM {
         int global_nx_, global_ny_;
         int local_nx_, local_ny_;
 
-        // Total size including ghost cells
+        // total size including ghost cells
         int total_nx_, total_ny_;
         static constexpr int GHOST_LAYERS = 1;
 
@@ -26,7 +26,8 @@ namespace LBM {
 
         int north_, south_, east_, west_;
 
-        int x_start_, y_start_;  // Global coordinates of first interior cell
+        // Global coordinates of first interior cell
+        int x_start_, y_start_;
 
         // f_current_ holds the post-streaming/BC state
         // f_next_ holds the post-collision state
@@ -225,7 +226,7 @@ namespace LBM {
                         uy(x, y) = 0.0;
                         rho(x, y) = 1.0;
 
-                        // Initialize solid cell distributions to zero velocity equilibrium
+                        // Initialise solid cell distributions to zero velocity equilibrium
                         int gx = x + GHOST_LAYERS;
                         int gy = y + GHOST_LAYERS;
                         double* f_curr = f_current_ptr(gx, gy);
@@ -321,7 +322,7 @@ namespace LBM {
             #pragma omp parallel reduction(max : local_max_sq)
             {
                 __m256d thread_max_vec = _mm256_setzero_pd();
-                // ignore barrier - threads continue working without wating for other threads to finish
+                // ignore barrier - threads continue working without waiting for other threads to finish
                 #pragma omp for schedule(static) nowait
                 for (size_t i = 0; i < (static_cast<size_t>(local_nx_) * local_ny_ / 4) * 4; i += 4) {
                     __m256d ux_vec = _mm256_loadu_pd(&ux_[i]);
@@ -343,10 +344,10 @@ namespace LBM {
         }
 
     private:
-        void initialise_2d_topology() {// dnfnwebiew
+        void initialise_2d_topology() {
             find_optimal_decomposition(mpi_size_, global_nx_, global_ny_, px_, py_);
             int dims[2] = {px_, py_};
-            int periods[2] = {0, 0};  // no more periodic boundary condotiitions
+            int periods[2] = {0, 0};  // no more periodic boundary conditions
             int reorder = 1;
             MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, reorder, &cart_comm_);
             MPI_Comm_rank(cart_comm_, &mpi_rank_);
@@ -363,6 +364,8 @@ namespace LBM {
         }
 
         void find_optimal_decomposition(int nprocs, int nx, int ny, int& px_out, int& py_out) {
+            // lowest suface-to-volume ratio
+            // maintains global aspect ratio
             double aspect_ratio = static_cast<double>(nx) / ny;
             double best_score = 1e9;
             int best_px = 1, best_py = nprocs;
@@ -375,6 +378,7 @@ namespace LBM {
                 double surface = 2.0 * (lnx + lny);
                 double volume = lnx * lny;
                 double local_aspect = static_cast<double>(lnx) / lny;
+                // heuristic - log is symmetric about 0
                 double aspect_penalty = std::abs(std::log(local_aspect / aspect_ratio));
                 double score = surface / std::sqrt(volume) + aspect_penalty;
                 if (score < best_score) {

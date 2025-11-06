@@ -1,3 +1,13 @@
+/*
+* LBMIO.h
+ *
+ * This file contains the IOManager class responsible for handling
+ * parallel I/O, force calculations, and final data aggregation using MPI.
+ *
+ * Note: AI assistance was used in the development and debugging
+ * of the MPI-Gatherv logic and file-writing routines in this class.
+ */
+
 #pragma once
 
 #include "LBMConfig.h"
@@ -35,6 +45,7 @@ public:
         }
     }
 
+    // Destructor
     ~IOManager() {
         if (mpi_rank_ == 0 && force_file_open_) {
             force_file_.close();
@@ -107,7 +118,7 @@ public:
 
         // Momentum exchange method:
         // For each solid cell, sum the momentum of populations that would stream
-        // from fluid neighbors into this solid cell
+        // from fluid neighbours into this solid cell
 
         for (int y = 0; y < grid.local_ny(); ++y) {
             for (int x = 0; x < grid.local_nx(); ++x) {
@@ -117,23 +128,23 @@ public:
                 int gx = x + GHOST;
                 int gy = y + GHOST;
 
-                // For each direction, check if there's a fluid neighbor
+                // For each direction, check if there's a fluid neighbour
                 // that would stream into this solid cell
                 for (int i = 1; i < Q; ++i) {
                     // Look in the OPPOSITE direction to find the fluid cell
                     // that has a population pointing toward this solid cell
                     int opp_i = OPPOSITE[i];
 
-                    // Fluid neighbor location (in local coordinates)
+                    // Fluid neighbour location (in local coordinates)
                     int fluid_x = x - VELOCITIES[i][0];
                     int fluid_y = y - VELOCITIES[i][1];
 
-                    // Check if this neighbor is in bounds and is fluid
+                    // Check if this neighbour is in bounds and is fluid
                     if (fluid_x >= 0 && fluid_x < grid.local_nx() &&
                         fluid_y >= 0 && fluid_y < grid.local_ny() &&
                         !grid.is_solid(fluid_x, fluid_y))
                     {
-                        // The fluid neighbor at (fluid_x, fluid_y) has a population
+                        // The fluid neighbour at (fluid_x, fluid_y) has a population
                         // in direction 'i' pointing toward this solid cell
                         int fluid_gx = fluid_x + GHOST;
                         int fluid_gy = fluid_y + GHOST;
@@ -208,6 +219,9 @@ public:
     }
 
 private:
+    /*
+     * Rebuilds the grid on a single process
+     */
     static void gather_and_reconstruct_field(const Grid& grid,
                                             std::vector<double>& global_ux,
                                             std::vector<double>& global_uy,

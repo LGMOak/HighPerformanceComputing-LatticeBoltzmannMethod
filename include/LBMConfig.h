@@ -30,7 +30,7 @@ namespace LBM {
         1.0/36.0, 1.0/36.0, 1.0/36.0, 1.0/36.0
         };
 
-    // Directions for bounce-back boundary conditions
+    // Direction vector opposites for bounce-back boundary conditions
     constexpr std::array<int, Q> OPPOSITE = {0, 3, 4, 1, 2, 7, 8, 5, 6};
 
     struct SimulationParams {
@@ -42,6 +42,7 @@ namespace LBM {
         int output_frequency = 140;
 
         // cylinder parameters
+        // percentage values
         double cylinder_x = 0.2;
         double cylinder_y = 0.5;
         double cylinder_radius = 0.05;
