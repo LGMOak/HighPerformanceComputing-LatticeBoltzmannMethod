@@ -72,6 +72,14 @@ The solver's accuracy is validated against physical benchmarks using the include
 
 ---
 
+### Development History
+
+This project evolved from a prior phase focused on analytical validation and micro-optimization. The initial **Poiseuille Channel Flow** solver:
+* Validated the LBM model against the analytical parabolic velocity profile (RMSE $\approx 0.003$).
+* Was used to benchmark the effectiveness of **SIMD (AVX2)** vectorization, yielding a measured $1.08\times$ total speedup.
+
+You can view this original code, including the analytic validation plots, in the separate [`Poiseuille`](https://github.com/lgmoak/HighPerformanceComputing-LatticeBoltzmannMethod/tree/Poiseuille) branch.
+
 ## 5. Quick Start Guide
 
 ### Requirements
