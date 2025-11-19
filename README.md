@@ -42,7 +42,7 @@ The solver achieves high scalability by employing a hybrid parallel strategy opt
 
 To maximise computational throughput on commodity CPUs, the core kernels are heavily optimised:
 
-* **SIMD Vectorization:** The equilibrium distribution function calculation is explicitly vectorised using **AVX2 intrinsics** (e.g., `_mm256_mul_pd`, `_mm256_add_pd`). This allows four double-precision floating-point operations to occur simultaneously per cycle.
+* **SIMD Vectorisation:** The equilibrium distribution function calculation is explicitly vectorised using **AVX2 intrinsics** (e.g., `_mm256_mul_pd`, `_mm256_add_pd`). This allows four double-precision floating-point operations to occur simultaneously per cycle.
 * **Memory Alignment:** Distribution arrays (`f_current`, `f_next`) are allocated with **`alignas(32)`** to ensure alignment with 256-bit AVX registers, preventing expensive unaligned load penalties.
 * **Structure of Arrays (SoA) Layout:** The data layout is optimised to ensure contiguous memory access during the collision step, reducing cache misses.
 
@@ -74,9 +74,9 @@ The solver's accuracy is validated against physical benchmarks using the include
 
 ### Development History
 
-This project evolved from a prior phase focused on analytical validation and micro-optimization. The initial **Poiseuille Channel Flow** solver:
+This project evolved from a prior phase focused on analytical validation and micro-optimisation. The initial **Poiseuille Channel Flow** solver:
 * Validated the LBM model against the analytical parabolic velocity profile (RMSE $\approx 0.003$).
-* Was used to benchmark the effectiveness of **SIMD (AVX2)** vectorization, yielding a measured $1.08\times$ total speedup.
+* Was used to benchmark the effectiveness of **SIMD (AVX2)** vectorisation, yielding a measured $1.08\times$ total speedup.
 
 You can view this original code, including the analytic validation plots, in the separate [`Poiseuille`](https://github.com/lgmoak/HighPerformanceComputing-LatticeBoltzmannMethod/tree/Poiseuille) branch.
 
