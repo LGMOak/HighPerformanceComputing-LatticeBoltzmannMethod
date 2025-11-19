@@ -87,7 +87,7 @@ You can view this original code, including the analytic validation plots, in the
 * **MPI** Implementation (OpenMPI, MPICH)
 * **OpenMP**
 * **CMake** 3.10+
-* **Python 3** (for visualization: `numpy`, `matplotlib`, `pandas`, `scipy`, `seaborn`)
+* **Python 3** (for visualisation: `numpy`, `matplotlib`, `pandas`, `scipy`, `seaborn`)
 
 ### Build Instructions
 
@@ -99,7 +99,7 @@ cd HighPerformanceComputing-LatticeBoltzmannMethod
 # 2. Create build directory
 mkdir build && cd build
 
-# 3. Configure and Build (Release mode for -O3 optimizations)
+# 3. Configure and Build (Release mode for -O3 optimisations)
 cmake -DCMAKE_BUILD_TYPE=Release ..
 cmake --build . -j$(nproc)
 ```
